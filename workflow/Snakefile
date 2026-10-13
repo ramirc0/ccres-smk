@@ -3,15 +3,14 @@ include: "rules/common.smk"
 include: "rules/inputs.smk"
 include: "rules/dhs.smk"
 include: "rules/tf.smk"
+include: "rules/signal.smk"
 
 
 rule all:
     input:
-        lambda w: [
-            path
+        [
+            f"{OUTDIR}/{genome}/{genome}-{mark}-maxZ.txt"
             for genome in GENOMES
-            for path in [
-                f"{OUTDIR}/{genome}/TF/{genome}-TF-List.Filtered.txt",
-                *processed_dhs(genome),
-            ]
+            for mark in MARKS
         ],
+        [f"{OUTDIR}/{genome}/TF/{genome}-rTFBS.bed" for genome in GENOMES],

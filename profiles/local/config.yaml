@@ -19,10 +19,14 @@ default-resources:          # fallback for trivial rules
   mem_mb: 2000
   runtime: 30
 
-set-threads:
-  verify: 8
-
 set-resources:              # tune from benchmarks/ TSVs after a real run
-  call_dhs: {mem_mb: 8000}
+  call_dhs: {mem_mb: 32000}
   process_dhs: {mem_mb: 4000}
-  verify: {mem_mb: 4000}
+  combine_dhs: {mem_mb: 100000}
+  create_rdhs: {mem_mb: 64000}
+  tf_peaks: {mem_mb: 16000}
+  tf_rpeaks: {mem_mb: 64000}
+  tf_clusters: {mem_mb: 128000}
+  extend_anchors: {mem_mb: 8000}
+  signal_zscore: {mem_mb: 8000}
+  max_zscore: {mem_mb: 16000}

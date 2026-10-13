@@ -101,8 +101,7 @@ class Track:
         self.starts = df["start"].cast(pl.Int64).to_numpy()
         self.ends = df["end"].cast(pl.Int64).to_numpy()
         self.orders = per_value(df["fdr"], fdr_order, pl.Int64)
-        # bedtools parses with atof. Python's float() rounds the same.
-        self.fdrs = per_value(df["fdr"], float, pl.Float64)
+        self.fdrs = _bed.python_floats(df["fdr"])
 
     def merged(self, rows):
         """Merge positions like `bedtools merge -d 1 -c 5 -o min`, then drop < 50 bp.

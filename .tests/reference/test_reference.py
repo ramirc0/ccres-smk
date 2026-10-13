@@ -8,6 +8,8 @@ from pathlib import Path
 
 # Columns 5-7 hold ;-joined sets. The original printed them in set() order.
 LIST_COLUMNS = (4, 5, 6)
+# Bound on z-score gaps from glibc's FMA versus non-FMA log. Observed: 9e-16.
+Z_TOLERANCE = 1e-14
 
 
 def same_bytes(a, b):
@@ -107,6 +109,32 @@ def except_column_6(line):
     return fields[:5] + fields[6:]
 
 
+def z_close(ours, ref):
+    """Compare z-score tables, allowing rounding-level gaps in column 2.
+
+    Parameters
+    ----------
+    ours, ref : pathlib.Path
+        Signal or maxZ tables, ours first.
+
+    Returns
+    -------
+    str or None
+        First difference beyond the tolerance, None if there is none.
+    """
+    with open(ours, "rb") as fa, open(ref, "rb") as fb:
+        n = 0
+        for n, (la, lb) in enumerate(zip(fa, fb), start=1):
+            a, b = strip(la).split(b"\t"), strip(lb).split(b"\t")
+            za, zb = float(a[1]), float(b[1])
+            if a[:1] + a[2:] != b[:1] + b[2:] or abs(za - zb) > Z_TOLERANCE:
+                return f"line {n}: ours {la[:300]!r} reference {lb[:300]!r}"
+        rest_a, rest_b = fa.readline(), fb.readline()
+    if rest_a or rest_b:
+        return f"{'ours' if rest_a else 'reference'} has more lines after line {n}"
+    return None
+
+
 def sort_lists(line):
     """Sort the ;-joined items of the set-valued columns of a line.
 
@@ -154,7 +182,8 @@ def difference(ours, ref, mode, tmp_path):
     ours, ref : pathlib.Path
         Our file and the reference file.
     mode : str
-        `bytes`, `ref-cols-1-8`, `except-col-6`, `sorted-lists` or `bigbed`.
+        `bytes`, `ref-cols-1-8`, `except-col-6`, `z-close`, `sorted-lists` or
+        `bigbed`.
     tmp_path : pathlib.Path
         Scratch directory.
 
@@ -173,6 +202,8 @@ def difference(ours, ref, mode, tmp_path):
         return first_difference(ours, ref, strip, strip) or "same lines, other bytes"
     if mode == "ref-cols-1-8":
         return first_difference(ours, ref, strip, first_8_columns)
+    if mode == "z-close":
+        return z_close(ours, ref)
     if mode == "except-col-6":
         return first_difference(ours, ref, except_column_6, except_column_6)
     return first_difference(ours, ref, sort_lists, sort_lists)

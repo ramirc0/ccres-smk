@@ -1,7 +1,10 @@
 # Config, per-genome lists, ENCODE path resolution, and wildcards.
 
+import sys
 from functools import cache
-from pathlib import Path
+
+sys.path.insert(0, f"{workflow.basedir}/scripts")
+from _encode import encode_path
 
 
 configfile: "config/config.yaml"
@@ -76,7 +79,7 @@ def read_rows(path):
 
 
 def encode_file(exp, acc, ext):
-    """Return the path of an ENCODE file, local mirror first.
+    """Return the path of an ENCODE file under the configured directories.
 
     Parameters
     ----------
@@ -90,11 +93,9 @@ def encode_file(exp, acc, ext):
     Returns
     -------
     str
-        `<encode_root>/<exp>/<acc>.<ext>` if it exists, else the
-        `<download_dir>` path that `download_encode` writes.
+        The mirror path if it exists, else the path `download_encode` writes.
     """
-    local = Path(ENCODE_ROOT, exp, f"{acc}.{ext}")
-    return str(local) if local.exists() else f"{DOWNLOAD_DIR}/{exp}/{acc}.{ext}"
+    return encode_path(ENCODE_ROOT, DOWNLOAD_DIR, exp, acc, ext)
 
 
 def hotspot_row(genome, row):

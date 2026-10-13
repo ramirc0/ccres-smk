@@ -77,3 +77,66 @@ rule process_dhs:
             --bigwig {input.bigwig:q} \
             --output {output:q}
         """
+
+
+rule combine_dhs:
+    input:
+        hotspots=lambda w: frozen(w.genome, "Hotspot-List.txt"),
+        processed=lambda w: processed_dhs(w.genome),
+    output:
+        all=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
+        filtered=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-Filtered.bed",
+    params:
+        processed=lambda w: f"{OUTDIR}/{w.genome}/rDHS/Processed-DHSs",
+        cutoff=lambda w: config["genomes"][w.genome]["dhs_signal_cutoff"],
+    log:
+        f"{LOGDIR}/combine_dhs/{{genome}}.txt",
+    benchmark:
+        f"{BENCHDIR}/combine_dhs/{{genome}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        python {workflow.basedir:q}/scripts/combine_dhs.py \
+            --hotspots {input.hotspots:q} \
+            --processed {params.processed:q} \
+            --cutoff {params.cutoff:q} \
+            --all {output.all:q} \
+            --filtered {output.filtered:q}
+        """
+
+
+rule create_rdhs:
+    input:
+        filtered=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-Filtered.bed",
+        previous=lambda w: frozen(w.genome, "rDHS-Previous.bed.gz"),
+        cdhs=lambda w: frozen(w.genome, "cDHSs.bed"),
+    output:
+        prestam=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-PreStam.txt",
+        complete=f"{OUTDIR}/{{genome}}/rDHS/completeCoverage.bed",
+        none=f"{OUTDIR}/{{genome}}/rDHS/NoCoverage.bed",
+        summary=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered-Summary.txt",
+        rdhs=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered.bed",
+    log:
+        f"{LOGDIR}/create_rdhs/{{genome}}.txt",
+    benchmark:
+        f"{BENCHDIR}/create_rdhs/{{genome}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        python {workflow.basedir:q}/scripts/create_rdhs.py \
+            --filtered {input.filtered:q} \
+            --previous {input.previous:q} \
+            --cdhs {input.cdhs:q} \
+            --genome {wildcards.genome:q} \
+            --prestam {output.prestam:q} \
+            --complete {output.complete:q} \
+            --none {output.none:q} \
+            --summary {output.summary:q} \
+            --rdhs {output.rdhs:q}
+        """

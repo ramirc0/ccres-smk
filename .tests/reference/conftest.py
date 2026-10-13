@@ -55,8 +55,22 @@ STEPS = {
         ("TF/{g}-rTFBS.bed", "{g}-TF/{name}", "bytes"),
     ],
     "anchors": [("{g}-Anchors.bed", "{name}", "bytes")],
-    "signal": [("signal-output/*/*.txt", "signal-output/{name}", "bytes")],
-    "maxz": [("{g}-*-maxZ.txt", "{name}", "bytes")],
+    # The release's ATAC files come from a September 2023 run whose glibc used
+    # its FMA log. The port uses the non-FMA log of the May 2022 run (D4).
+    "signal": [
+        *(
+            (f"signal-output/{mark}/*.txt", "signal-output/{name}", "bytes")
+            for mark in ("DNase", "H3K4me3", "H3K27ac", "CTCF")
+        ),
+        ("signal-output/ATAC/*.txt", "signal-output/{name}", "z-close"),
+    ],
+    "maxz": [
+        *(
+            (f"{{g}}-{mark}-maxZ.txt", "{name}", "bytes")
+            for mark in ("DNase", "H3K4me3", "H3K27ac", "CTCF")
+        ),
+        ("{g}-ATAC-maxZ.txt", "{name}", "z-close"),
+    ],
     "ccres": [("{g}-cCREs-Unfiltered.bed", "{name}", "bytes")],
     "cts": [
         (

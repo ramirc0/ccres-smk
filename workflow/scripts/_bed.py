@@ -258,6 +258,45 @@ def chrom_codes(chroms):
     return chroms.replace_strict(codes, return_dtype=pl.Int64).to_numpy()
 
 
+def shared_codes(*chroms):
+    """Code the chromosomes of several tables with one numbering.
+
+    Parameters
+    ----------
+    *chroms : polars.Series
+        Chromosome of each row, one series per table.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        Codes per table as int64, in the order given.
+    """
+    first_seen = pl.concat(chroms).unique(maintain_order=True).to_list()
+    codes = {chrom: i for i, chrom in enumerate(first_seen)}
+    return [c.replace_strict(codes, return_dtype=pl.Int64).to_numpy() for c in chroms]
+
+
+def python_floats(series):
+    """Parse number texts as Python's float() does, once per distinct text.
+
+    C's strtod and atof round the same way, so this also matches awk and
+    bedtools.
+
+    Parameters
+    ----------
+    series : polars.Series
+        Number texts.
+
+    Returns
+    -------
+    numpy.ndarray
+        Values as float64.
+    """
+    distinct = series.unique().to_list()
+    mapping = dict(zip(distinct, map(float, distinct)))
+    return series.replace_strict(mapping, return_dtype=pl.Float64).to_numpy()
+
+
 def axis(codes, positions):
     """Place (chromosome code, position) pairs on one integer axis.
 
