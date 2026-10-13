@@ -37,3 +37,210 @@ rule classify_ccres:
             --genome {wildcards.genome:q} \
             --output {output:q}
         """
+
+
+import master_cell_list as mcl
+
+
+@cache
+def _master_rows(lists, tf_list):
+    """Return the master cell list rows of frozen lists, once per path set.
+
+    Parameters
+    ----------
+    lists : tuple of str
+        DNase, H3K4me3, H3K27ac and CTCF lists.
+    tf_list : str
+        Cell type TF experiment list.
+
+    Returns
+    -------
+    list of list of str
+        Master cell list rows.
+    """
+    return mcl.master_rows(list(lists), tf_list)
+
+
+def master_rows(genome):
+    """Return a genome's master cell list rows.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+
+    Returns
+    -------
+    list of list of str
+        Master cell list rows.
+    """
+    lists = tuple(frozen(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
+    return _master_rows(lists, frozen(genome, "TF-List.Cell-Type.txt"))
+
+
+def cell_type_files(genome):
+    """List the step 7 outputs of a genome, one per master cell list row.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+
+    Returns
+    -------
+    list of str
+        bgzipped BED per biosample.
+    """
+    return [
+        f"{OUTDIR}/{genome}/Cell-Type-Specific/Individual-Files/{mcl.output_name(r)}.bed.gz"
+        for r in master_rows(genome)
+    ]
+
+
+def cell_type_inputs(w):
+    """Name the inputs of one biosample's classification.
+
+    Parameters
+    ----------
+    w : snakemake.io.Wildcards
+        Wildcards genome and cts.
+
+    Returns
+    -------
+    dict of str to str or list of str
+        Signal tables per present mark and, for the TF branch, the TF list and
+        the biosample's peak files.
+    """
+    (row,) = [r for r in master_rows(w.genome) if mcl.output_name(r) == w.cts]
+    inputs = {
+        mark.lower(): f"{OUTDIR}/{w.genome}/signal-output/{mark}/{row[2 * i]}-{row[2 * i + 1]}.txt"
+        for i, mark in enumerate(mcl.MARKS)
+        if row[2 * i] != mcl.MISSING
+    }
+    if row[0] != mcl.MISSING and row[-1] == "yes":
+        tf_list = frozen(w.genome, "TF-List.Cell-Type.txt")
+        excluded = config["genomes"][w.genome]["tf_excluded"]
+        inputs["tf_list"] = tf_list
+        inputs["tf_peaks"] = [
+            ancient(encode_file(r[0], r[1], "bed.gz"))
+            for r in read_rows(tf_list)
+            if r[-1].split()[-1] == row[8] and r[0] not in excluded
+        ]
+    return inputs
+
+
+def cell_type_flags(w, input):
+    """Return the cell_type_ccres.py flags of one biosample.
+
+    Parameters
+    ----------
+    w : snakemake.io.Wildcards
+        Wildcards genome and cts.
+    input : snakemake.io.InputFiles
+        The job's named inputs.
+
+    Returns
+    -------
+    list of str
+        Signal flags, then the TF branch flags.
+    """
+    flags = []
+    for mark in mcl.MARKS:
+        if mark.lower() in input.keys():
+            flags += [f"--{mark.lower()}", input[mark.lower()]]
+    if "tf_list" in input.keys():
+        (row,) = [r for r in master_rows(w.genome) if mcl.output_name(r) == w.cts]
+        flags += [
+            "--tf-list", input.tf_list,
+            "--biosample", row[8],
+            "--encode-root", ENCODE_ROOT,
+            "--download-dir", DOWNLOAD_DIR,
+            "--exclude", *config["genomes"][w.genome]["tf_excluded"],
+        ]
+    return flags
+
+
+rule master_cell_list:
+    input:
+        **{
+            mark.lower(): (lambda w, mark=mark: frozen(w.genome, f"{mark}-List.txt"))
+            for mark in mcl.MARKS
+        },
+        tf_list=lambda w: frozen(w.genome, "TF-List.Cell-Type.txt"),
+    output:
+        f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
+    log:
+        f"{LOGDIR}/master_cell_list/{{genome}}.txt",
+    benchmark:
+        f"{BENCHDIR}/master_cell_list/{{genome}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        python {workflow.basedir:q}/scripts/master_cell_list.py \
+            --dnase {input.dnase:q} \
+            --h3k4me3 {input.h3k4me3:q} \
+            --h3k27ac {input.h3k27ac:q} \
+            --ctcf {input.ctcf:q} \
+            --tf-list {input.tf_list:q} \
+            --output {output:q}
+        """
+
+
+rule cell_type_ccres:
+    input:
+        unpack(cell_type_inputs),
+        master=f"{OUTDIR}/{{genome}}/{{genome}}-cCREs-Unfiltered.bed",
+        tss=lambda w: frozen(w.genome, "TSS.Basic.bed"),
+        tss_4k=lambda w: frozen(w.genome, "TSS.Basic.4K.bed"),
+    output:
+        bed=f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Individual-Files/{{cts}}.bed.gz",
+        tbi=f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Individual-Files/{{cts}}.bed.gz.tbi",
+    params:
+        flags=cell_type_flags,
+    wildcard_constraints:
+        cts=r"[A-Za-z0-9_]+",
+    log:
+        f"{LOGDIR}/cell_type_ccres/{{genome}}/{{cts}}.txt",
+    benchmark:
+        f"{BENCHDIR}/cell_type_ccres/{{genome}}/{{cts}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        python {workflow.basedir:q}/scripts/cell_type_ccres.py \
+            --master {input.master:q} \
+            --tss {input.tss:q} \
+            --tss-4k {input.tss_4k:q} \
+            {params.flags:q} \
+            --output {output.bed:q}
+        """
+
+
+rule pls_genes:
+    input:
+        ccres=f"{OUTDIR}/{{genome}}/{{genome}}-cCREs-Unfiltered.bed",
+        tss=lambda w: frozen(w.genome, "TSS.Basic.bed"),
+        tss_4k=lambda w: frozen(w.genome, "TSS.Basic.4K.bed"),
+    output:
+        f"{OUTDIR}/{{genome}}/{{genome}}-PLS-Gene-List.txt",
+    log:
+        f"{LOGDIR}/pls_genes/{{genome}}.txt",
+    benchmark:
+        f"{BENCHDIR}/pls_genes/{{genome}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        python {workflow.basedir:q}/scripts/pls_genes.py \
+            --ccres {input.ccres:q} \
+            --tss {input.tss:q} \
+            --tss-4k {input.tss_4k:q} \
+            --output {output:q}
+        """

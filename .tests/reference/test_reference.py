@@ -3,7 +3,8 @@
 Select a step with `-m <step>` and a genome with `-k <genome>`.
 """
 
-import subprocess
+import gzip
+import shutil
 from pathlib import Path
 
 # Columns 5-7 hold ;-joined sets. The original printed them in set() order.
@@ -155,22 +156,23 @@ def sort_lists(line):
     return fields
 
 
-def bigbed_text(path, out):
-    """Convert a bigBed to BED text with bigBedToBed.
+def gunzipped(path, out):
+    """Decompress a gzip or bgzip file.
 
     Parameters
     ----------
     path : pathlib.Path
-        bigBed file.
+        Compressed file.
     out : pathlib.Path
-        BED text file to write.
+        Text file to write.
 
     Returns
     -------
     pathlib.Path
         `out`.
     """
-    subprocess.run(["bigBedToBed", str(path), str(out)], check=True)
+    with gzip.open(path, "rb") as f, open(out, "wb") as o:
+        shutil.copyfileobj(f, o)
     return out
 
 
@@ -183,7 +185,7 @@ def difference(ours, ref, mode, tmp_path):
         Our file and the reference file.
     mode : str
         `bytes`, `ref-cols-1-8`, `except-col-6`, `z-close`, `sorted-lists` or
-        `bigbed`.
+        `gunzip`.
     tmp_path : pathlib.Path
         Scratch directory.
 
@@ -192,9 +194,8 @@ def difference(ours, ref, mode, tmp_path):
     str or None
         First difference, None if the files match under `mode`.
     """
-    if mode == "bigbed":
-        ours = bigbed_text(ours, tmp_path / "ours.bed")
-        ref = bigbed_text(ref, tmp_path / "ref.bed")
+    if mode == "gunzip":
+        ours = gunzipped(ours, tmp_path / "ours.bed")
         mode = "bytes"
     if mode == "bytes":
         if same_bytes(ours, ref):

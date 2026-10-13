@@ -149,7 +149,7 @@ def _tie_break(line_list, order, tied_groups):
         order[begin:end] = [r for _, r in keyed]
 
 
-def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None):
+def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None, line=None):
     r"""Order rows like GNU sort under en_US.UTF-8, without -u.
 
     Rows compare by the keys in `key_order`, then by whole line with strcoll,
@@ -166,6 +166,9 @@ def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None):
         Integer columns compared by value (`-n`).
     key_order : sequence of str, optional
         Order of the keys. Defaults to the text keys, then the numeric keys.
+    line : str, optional
+        Column holding each row's whole line. Defaults to the columns joined
+        by tabs.
 
     Returns
     -------
@@ -182,7 +185,8 @@ def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None):
     order = np.lexsort(keys[::-1]) if keys else np.arange(df.height)
     tied_groups = _tied_groups([k[order] for k in keys], df.height)
     if tied_groups:
-        _tie_break(lines(df).to_list(), order, tied_groups)
+        whole = df[line] if line else lines(df)
+        _tie_break(whole.to_list(), order, tied_groups)
     return order
 
 

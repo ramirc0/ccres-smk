@@ -57,6 +57,8 @@ set-resources:              # tune from benchmarks/ TSVs after a real run
     runtime: 120m
   classify_ccres:
     mem_mb: 16000 * attempt
+  cell_type_ccres:
+    mem_mb: 16000 * attempt
 
 rerun-incomplete: true
 keep-going: true

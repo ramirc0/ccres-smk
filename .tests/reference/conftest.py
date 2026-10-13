@@ -79,14 +79,9 @@ STEPS = {
             "bytes",
         ),
         (
-            "Cell-Type-Specific/Individual-Files/*.bed",
-            "Cell-Type-Specific/Individual-Files/{name}",
-            "bytes",
-        ),
-        (
-            "Cell-Type-Specific/Individual-Files/*.bigBed",
-            "Cell-Type-Specific/Individual-Files/{name}",
-            "bigbed",
+            "Cell-Type-Specific/Individual-Files/*.bed.gz",
+            "Cell-Type-Specific/Individual-Files/{stem}",
+            "gunzip",
         ),
     ],
     "pls": [("{g}-PLS-Gene-List.txt", "PLS-Gene-List.{g}-V4.txt", "bytes")],

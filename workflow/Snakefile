@@ -14,4 +14,14 @@ rule all:
             for genome in GENOMES
             for mark in MARKS
         ],
-        [f"{OUTDIR}/{genome}/{genome}-cCREs-Unfiltered.bed" for genome in GENOMES],
+        [f"{OUTDIR}/{genome}/{genome}-PLS-Gene-List.txt" for genome in GENOMES],
+        # Step 7 needs the frozen TF list of the release's TF-flagged biosamples.
+        lambda w: [
+            path
+            for genome in GENOMES
+            if "TF-List.Cell-Type.txt" in config["sources"][genome]
+            for path in [
+                f"{OUTDIR}/{genome}/Cell-Type-Specific/Master-Cell-List.txt",
+                *cell_type_files(genome),
+            ]
+        ],
