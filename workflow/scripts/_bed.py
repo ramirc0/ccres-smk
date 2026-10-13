@@ -281,10 +281,10 @@ def shared_codes(*chroms):
 
 
 def python_floats(series):
-    """Parse number texts as Python's float() does, once per distinct text.
+    """Parse number texts as Python's float() does.
 
-    C's strtod and atof round the same way, so this also matches awk and
-    bedtools.
+    polars rounds correctly, as float(), C's strtod and awk do. Texts that
+    float() accepts but polars rejects, such as " 1" or "1_0", raise instead.
 
     Parameters
     ----------
@@ -296,9 +296,7 @@ def python_floats(series):
     numpy.ndarray
         Values as float64.
     """
-    distinct = series.unique().to_list()
-    mapping = dict(zip(distinct, map(float, distinct)))
-    return series.replace_strict(mapping, return_dtype=pl.Float64).to_numpy()
+    return series.cast(pl.Float64, strict=True).to_numpy()
 
 
 def axis(codes, positions):

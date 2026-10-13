@@ -1,5 +1,8 @@
 """Differential tests of _bed against bedtools 2.30.0 and GNU sort under en_US."""
 
+import decimal
+from decimal import Decimal
+
 import _bed
 import numpy as np
 import polars as pl
@@ -260,6 +263,49 @@ def test_read_tsv_roundtrip(tmp_path):
     empty = tmp_path / "empty.tsv"
     empty.write_text("")
     assert _bed.read_tsv(empty, ["c", "s"]).shape == (0, 2)
+
+
+def number_texts(rng, n):
+    """Draw number texts in the pipeline's formats, plus rounding ties.
+
+    Parameters
+    ----------
+    rng : numpy.random.Generator
+        Random source.
+    n : int
+        Number of doubles drawn.
+
+    Returns
+    -------
+    list of str
+        repr, %g and %.10g texts of doubles over the whole range, subnormals
+        included. Then the exact midpoint of each double and its successor,
+        and the decimals just above and below it.
+    """
+    values = rng.standard_normal(n) * 10.0 ** rng.integers(-323, 307, n)
+    texts = [*map(repr, values.tolist()), *FDRS, "-10", "0", "2351211"]
+    texts += [f"{v:{spec}}" for spec in ("g", ".10g") for v in values.tolist()]
+    with decimal.localcontext() as ctx:
+        ctx.prec = 1100
+        for v in values.tolist():
+            mid = (Decimal(v) + Decimal(float(np.nextafter(v, np.inf)))) / 2
+            texts += [str(mid), str(mid.next_plus()), str(mid.next_minus())]
+    return texts
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_python_floats(seed):
+    """python_floats equals float() bit for bit, rounding ties included."""
+    texts = number_texts(np.random.default_rng(seed), 2000)
+    ours = _bed.python_floats(pl.Series(texts))
+    expected = np.array([float(t) for t in texts])
+    assert np.array_equal(ours.view(np.uint64), expected.view(np.uint64))
+
+
+def test_python_floats_rejects_padding():
+    """Text that float() would strip raises instead of parsing."""
+    with pytest.raises(pl.exceptions.InvalidOperationError):
+        _bed.python_floats(pl.Series(["1.5", " 1"]))
 
 
 @pytest.mark.parametrize("seed", range(4))
