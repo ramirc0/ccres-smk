@@ -105,6 +105,11 @@ def write_tsv(df, path):
 def collation_ranks(values):
     """Rank strings by en_US collation. Equal-collating strings share a rank.
 
+    en_US gives each digit and capital letter its own primary weight, in
+    ASCII order, and ignores none of them. Strings made only of these
+    characters, such as accessions, therefore collate as their bytes compare.
+    They skip strxfrm.
+
     Parameters
     ----------
     values : polars.Series
@@ -115,6 +120,8 @@ def collation_ranks(values):
     numpy.ndarray
         Dense int64 rank of each value.
     """
+    if values.str.contains(r"^[0-9A-Z]+$").all():
+        return values.rank("dense").cast(pl.Int64).to_numpy()
     distinct = values.unique().to_list()
     keys = [locale.strxfrm(v) for v in distinct]
     order = sorted(range(len(distinct)), key=keys.__getitem__)

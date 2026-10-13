@@ -242,6 +242,18 @@ def test_gnu_sort_field_key(gnu_sort, seed):
 
 
 @pytest.mark.parametrize("seed", range(3))
+def test_gnu_sort_accessions(gnu_sort, seed):
+    """Strings of digits and capitals, prefixes and repeats included, sort as GNU sort."""
+    rng = np.random.default_rng(seed)
+    alphabet = list("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    names = ["".join(rng.choice(alphabet, rng.integers(1, 15))) for _ in range(3000)]
+    names += [n[: rng.integers(1, len(n) + 1)] for n in names[:500]] + names[:300]
+    df = pl.DataFrame({"name": names})
+    order = _bed.gnu_sort(df, text_keys=["name"])
+    assert text(df[order]) == gnu_sort([], text(df))
+
+
+@pytest.mark.parametrize("seed", range(3))
 def test_sort_unique(gnu_sort, seed):
     """sort_unique reproduces `sort -u`."""
     df = tied_lines(np.random.default_rng(seed), 3000)
