@@ -134,26 +134,62 @@ def collation_ranks(values):
     return values.replace_strict(rank_of, return_dtype=pl.Int64).to_numpy()
 
 
-def _tie_break(line_list, order, tied_groups):
+def _tie_break(whole, order, tied_groups):
     """Order each group of key-tied rows by whole-line collation.
+
+    Groups sort by bytes first, then strcoll checks each adjacent pair. A group
+    whose pairs all collate in order is sorted, since collation is transitive.
+    The rest sort by strxfrm. Both sorts are stable, so equal lines keep their
+    order.
 
     Parameters
     ----------
-    line_list : list of str
+    whole : polars.Series
         Line of each row.
     order : numpy.ndarray
         Row indices sorted by the keys. Reordered in place.
     tied_groups : list of tuple of int
         `(start, stop)` positions in `order` of each group of tied rows.
+
+    Raises
+    ------
+    ValueError
+        If two distinct lines collate equal. GNU sort's order would then depend
+        on its merge.
     """
-    for begin, end in tied_groups:
+    starts, stops = np.array(tied_groups).T
+    sizes = stops - starts
+    group = np.repeat(np.arange(len(sizes)), sizes)
+    positions = np.repeat(starts - np.cumsum(sizes) + sizes, sizes)
+    positions += np.arange(len(positions))
+    tied_rows = order[positions]
+    tied = pl.DataFrame(
+        {"group": group, "row": tied_rows, "line": whole.gather(tied_rows)}
+    ).sort(["group", "line"], maintain_order=True)
+    order[positions] = tied["row"].to_numpy()
+    texts = tied["line"].to_list()
+    pairs = np.flatnonzero(group[1:] == group[:-1])
+    left = pairs.tolist()
+    collated = np.fromiter(
+        map(locale.strcoll, [texts[i] for i in left], [texts[i + 1] for i in left]),
+        dtype=np.int64,
+        count=len(left),
+    )
+    for i in pairs[collated == 0].tolist():
+        if texts[i] != texts[i + 1]:
+            raise ValueError(f"Distinct lines collate equal: {texts[i]!r}")
+    for g in np.unique(group[pairs[collated > 0]]).tolist():
+        begin, end = tied_groups[g]
         rows = order[begin:end].tolist()
-        keyed = [(locale.strxfrm(line_list[r]), r) for r in rows]
-        keyed.sort(key=lambda pair: pair[0])
-        for (key, r), (next_key, s) in pairwise(keyed):
-            if key == next_key and line_list[r] != line_list[s]:
-                raise ValueError(f"Distinct lines collate equal: {line_list[r]!r}")
-        order[begin:end] = [r for _, r in keyed]
+        group_texts = whole.gather(rows).to_list()
+        keyed = sorted(
+            zip(map(locale.strxfrm, group_texts), group_texts, rows),
+            key=lambda item: item[0],
+        )
+        for (key, text, _), (next_key, next_text, _) in pairwise(keyed):
+            if key == next_key and text != next_text:
+                raise ValueError(f"Distinct lines collate equal: {text!r}")
+        order[begin:end] = [r for _, _, r in keyed]
 
 
 def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None, line=None):
@@ -193,7 +229,7 @@ def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None, line=None):
     tied_groups = _tied_groups([k[order] for k in keys], df.height)
     if tied_groups:
         whole = df[line] if line else lines(df)
-        _tie_break(whole.to_list(), order, tied_groups)
+        _tie_break(whole, order, tied_groups)
     return order
 
 

@@ -228,6 +228,7 @@ def tied_lines(rng, n):
 def test_gnu_sort_bed(gnu_sort, seed):
     """gnu_sort reproduces `sort -k1,1 -k2,2n` with its whole-line tie-break."""
     df = tied_lines(np.random.default_rng(seed), 3000)
+    df = pl.concat([df, df[::7]])
     order = _bed.gnu_sort(df, text_keys=["chrom"], numeric_keys=["start"])
     assert text(df[order]) == gnu_sort(["-k1,1", "-k2,2n"], text(df))
 
