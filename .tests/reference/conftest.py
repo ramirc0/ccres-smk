@@ -85,7 +85,8 @@ STEPS = {
             "gunzip",
         ),
     ],
-    "pls": [("{g}-PLS-Gene-List.txt", "PLS-Gene-List.{g}-V4.txt", "bytes")],
+    # The release has no mm10 PLS gene list.
+    "pls": [("{g}-PLS-Gene-List.txt", "PLS-Gene-List.{g}-V4.txt", "bytes", {"hg38"})],
 }
 
 
