@@ -253,7 +253,9 @@ def chrom_codes(chroms):
     numpy.ndarray
         Code of each row, int64. Rows grouped by chromosome get increasing codes.
     """
-    return chroms.rank("dense", maintain_order=True).cast(pl.Int64).to_numpy() - 1
+    first_seen = chroms.unique(maintain_order=True).to_list()
+    codes = {chrom: i for i, chrom in enumerate(first_seen)}
+    return chroms.replace_strict(codes, return_dtype=pl.Int64).to_numpy()
 
 
 def axis(codes, positions):

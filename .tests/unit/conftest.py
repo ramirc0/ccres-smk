@@ -62,3 +62,24 @@ def gnu_sort():
         Takes sort arguments and the input text, returns sorted text.
     """
     return lambda args, text: run(["sort", *args], text, {"LC_ALL": "en_US.UTF-8"})
+
+
+ORIGINAL = Path(
+    os.environ.get(
+        "CCRE_ORIGINAL", "~/Git_Repos/ENCODE-cCREs/Version-4/cCRE-Pipeline/Toolkit"
+    )
+).expanduser()
+
+
+@pytest.fixture
+def original():
+    """Locate the original Toolkit scripts, skipping when they are absent.
+
+    Returns
+    -------
+    pathlib.Path
+        Toolkit directory of the original pipeline.
+    """
+    if not ORIGINAL.is_dir():
+        pytest.skip(f"original Toolkit not found at {ORIGINAL}")
+    return ORIGINAL
