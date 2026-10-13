@@ -260,3 +260,31 @@ def test_read_tsv_roundtrip(tmp_path):
     empty = tmp_path / "empty.tsv"
     empty.write_text("")
     assert _bed.read_tsv(empty, ["c", "s"]).shape == (0, 2)
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_closest_pairs(bedtools, tmp_path, seed):
+    """closest_pairs lists the pairs of `bedtools closest -d`, ties and order included."""
+    rng = np.random.default_rng(seed)
+    a = random_bed(rng, 800, span=20000, max_len=300)
+    b = random_bed(rng, 400, span=20000, max_len=40, zero=0.5)
+    # Repeat some B rows so that several B share a position.
+    b = pl.concat([b, b.sample(150, seed=seed)])
+    a_codes, a_starts, _ = arrays(a)
+    b_codes, b_starts, _ = arrays(b)
+    a = a[np.lexsort((a_starts, a_codes))]
+    b = b[np.lexsort((b_starts, b_codes))]
+    pa, pb = write(a, tmp_path, "a.bed"), write(b, tmp_path, "b.bed")
+    # Number B's chromosomes against its row order, as shared_codes may.
+    b_arrays = arrays(b)
+    b_arrays = (len(CHROMS) - 1 - b_arrays[0], *b_arrays[1:])
+    a_arrays = arrays(a)
+    a_arrays = (len(CHROMS) - 1 - a_arrays[0], *a_arrays[1:])
+    ia, ib = _bed.closest_pairs(a_arrays, b_arrays)
+    a_lines, b_lines = _bed.lines(a).to_list(), _bed.lines(b).to_list()
+    ours = [f"{a_lines[i]}\t{b_lines[j]}" for i, j in zip(ia, ib)]
+    expected = [
+        line.rsplit("\t", 1)[0]
+        for line in bedtools("closest", "-d", "-a", pa, "-b", pb).splitlines()
+    ]
+    assert ours == expected

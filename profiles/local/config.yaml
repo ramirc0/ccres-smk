@@ -30,3 +30,4 @@ set-resources:              # tune from benchmarks/ TSVs after a real run
   extend_anchors: {mem_mb: 8000}
   signal_zscore: {mem_mb: 8000}
   max_zscore: {mem_mb: 16000}
+  classify_ccres: {mem_mb: 16000}

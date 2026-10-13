@@ -4,6 +4,7 @@ include: "rules/inputs.smk"
 include: "rules/dhs.smk"
 include: "rules/tf.smk"
 include: "rules/signal.smk"
+include: "rules/classify.smk"
 
 
 rule all:
@@ -13,4 +14,4 @@ rule all:
             for genome in GENOMES
             for mark in MARKS
         ],
-        [f"{OUTDIR}/{genome}/TF/{genome}-rTFBS.bed" for genome in GENOMES],
+        [f"{OUTDIR}/{genome}/{genome}-cCREs-Unfiltered.bed" for genome in GENOMES],

@@ -509,3 +509,82 @@ def overlap_pairs(a, b):
     keep = overlap > 0
     ia, ib = ia[keep], b_index[ib[keep]]
     return ia, ib, overlap[keep] - 2 * (b[1][ib] == b[2][ib])
+
+
+def closest_pairs(a, b):
+    """List the closest B of each A in `bedtools closest -t all` output order.
+
+    Overlapping B intervals come first, at distance 0. Without one, the
+    nearest B ending at or before A's start (left) and the nearest B starting
+    at or after A's end (right) compete. The nearer side wins, and a tie
+    reports left before right. Within a side, tied B intervals come in B row
+    order. Coordinates are bedtools-adjusted.
+
+    Parameters
+    ----------
+    a, b : tuple of numpy.ndarray
+        `(codes, starts, ends)`. Codes MUST come from one shared numbering. B
+        rows MUST be sorted by start within each chromosome, as bedtools
+        requires. The chromosome order is free.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        A index and B index of each reported pair, grouped by A in A order.
+    """
+    a_s, a_e = bedtools_coords(a[1], a[2])
+    b_s, b_e = bedtools_coords(b[1], b[2])
+    same_chrom = b[0][1:] == b[0][:-1]
+    if np.any(b_s[1:][same_chrom] < b_s[:-1][same_chrom]):
+        raise ValueError("B rows are not sorted by start within a chromosome.")
+    as_, ae = axis(a[0], a_s), axis(a[0], a_e)
+    bs, be = axis(b[0], b_s), axis(b[0], b_e)
+    by_start = np.argsort(bs, kind="stable")
+    starts = bs[by_start]
+    n = len(as_)
+
+    # Overlaps: B starting before A's end and ending after A's start.
+    ov_a, ov_b, _ = overlap_pairs((a[0], a_s, a_e), (b[0], b_s, b_e))
+    has_overlap = np.zeros(n, dtype=bool)
+    has_overlap[ov_a] = True
+
+    # Left: largest end <= A's start, on A's chromosome.
+    by_end = np.lexsort((np.arange(len(be)), be))
+    ends = be[by_end]
+    left_end = np.full(n, -1, dtype=np.int64)
+    k = np.searchsorted(ends, as_, side="right") - 1
+    ok = (k >= 0) & ~has_overlap
+    ok[ok] = (ends[k[ok]] >> _CHROM_SHIFT) == (as_[ok] >> _CHROM_SHIFT)
+    left_end[ok] = ends[k[ok]]
+
+    # Right: smallest start >= A's end, on A's chromosome.
+    right_start = np.full(n, -1, dtype=np.int64)
+    k = np.searchsorted(starts, ae, side="left")
+    ok = (k < len(starts)) & ~has_overlap
+    ok[ok] = (starts[k[ok]] >> _CHROM_SHIFT) == (ae[ok] >> _CHROM_SHIFT)
+    right_start[ok] = starts[k[ok]]
+
+    left_dist = np.where(left_end >= 0, as_ - left_end + 1, np.iinfo(np.int64).max)
+    right_dist = np.where(
+        right_start >= 0, right_start - ae + 1, np.iinfo(np.int64).max
+    )
+    use_left = (left_end >= 0) & (left_dist <= right_dist)
+    use_right = (right_start >= 0) & (right_dist <= left_dist)
+
+    pairs = []
+    for i in range(n):
+        if has_overlap[i]:
+            continue
+        if use_left[i]:
+            lo = np.searchsorted(ends, left_end[i], side="left")
+            hi = np.searchsorted(ends, left_end[i], side="right")
+            pairs.extend((i, j) for j in by_end[lo:hi])
+        if use_right[i]:
+            lo = np.searchsorted(starts, right_start[i], side="left")
+            hi = np.searchsorted(starts, right_start[i], side="right")
+            pairs.extend((i, j) for j in by_start[lo:hi])
+    near = np.array(pairs, dtype=np.int64).reshape(-1, 2)
+    ia = np.concatenate([ov_a, near[:, 0]])
+    ib = np.concatenate([ov_b, near[:, 1]])
+    order = np.lexsort((np.arange(len(ia)), ia))
+    return ia[order], ib[order]
