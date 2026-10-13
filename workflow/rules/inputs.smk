@@ -66,6 +66,8 @@ rule download_encode:
         f"{LOGDIR}/download_encode/{{exp}}/{{acc}}.{{ext}}.txt",
     benchmark:
         f"{BENCHDIR}/download_encode/{{exp}}/{{acc}}.{{ext}}.tsv",
+    params:
+        metadata=config["encode_metadata"],
     wildcard_constraints:
         ext=r"bed\.gz|bigWig",
     software:
@@ -76,6 +78,6 @@ rule download_encode:
 
         python {workflow.basedir:q}/scripts/download_encode.py \
             --accession {wildcards.acc:q} \
-            --extension {wildcards.ext:q} \
+            --metadata {params.metadata:q} \
             --output {output:q}
         """

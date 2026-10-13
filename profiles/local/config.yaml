@@ -23,4 +23,6 @@ set-threads:
   verify: 8
 
 set-resources:              # tune from benchmarks/ TSVs after a real run
+  call_dhs: {mem_mb: 8000}
+  process_dhs: {mem_mb: 4000}
   verify: {mem_mb: 4000}

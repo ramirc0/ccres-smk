@@ -5,6 +5,8 @@ run_id: v7               # outputs go under <outdir>/<run_id>/<genome>/; overrid
 inputs_dir: data/inputs                      # frozen inputs, checked against config/inputs.b3
 encode_root: /data/projects/encode/data      # ENCODE mirror, <exp>/<file>.<ext>
 download_dir: data/encode                    # same layout, for files missing from the mirror
+# ENCODE file report snapshot (s3_uri, md5sum) used by download_encode.
+encode_metadata: /home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/parquets/file.parquet
 
 # Constants hardcoded in the original scripts. No published code derives them.
 # min_p: minP in 0_Call-DHSs.sh (last FDR threshold, 1E-<min_p>). That script

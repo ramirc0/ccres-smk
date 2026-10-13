@@ -1,5 +1,6 @@
 # Config, per-genome lists, ENCODE path resolution, and wildcards.
 
+from functools import cache
 from pathlib import Path
 
 
@@ -32,6 +33,7 @@ wildcard_constraints:
     mark="|".join(MARKS),
     exp=r"ENCSR\d{3}[A-Z]{3}",
     acc=r"ENCFF\d{3}[A-Z]{3}",
+    row=r"\d+",
 
 
 def frozen(genome, name):
@@ -55,8 +57,9 @@ def frozen(genome, name):
     return checkpoints.freeze_input.get(genome=genome, name=name).output[0]
 
 
+@cache
 def read_rows(path):
-    """Read a tab-separated list file.
+    """Read a tab-separated list file, once per path.
 
     Parameters
     ----------
@@ -92,3 +95,41 @@ def encode_file(exp, acc, ext):
     """
     local = Path(ENCODE_ROOT, exp, f"{acc}.{ext}")
     return str(local) if local.exists() else f"{DOWNLOAD_DIR}/{exp}/{acc}.{ext}"
+
+
+def hotspot_row(genome, row):
+    """Return one row of a genome's hotspot list.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+    row : int or str
+        1-based row number.
+
+    Returns
+    -------
+    list of str
+        Experiment, peak file, signal file, then the other columns.
+    """
+    return read_rows(frozen(genome, "Hotspot-List.txt"))[int(row) - 1]
+
+
+def hotspot_experiment(genome, peak):
+    """Return the experiment of a hotspot peak file.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+    peak : str
+        Peak file accession, column 2 of the hotspot list.
+
+    Returns
+    -------
+    str
+        Experiment accession.
+    """
+    rows = read_rows(frozen(genome, "Hotspot-List.txt"))
+    (exp,) = [r[0] for r in rows if r[1] == peak]
+    return exp

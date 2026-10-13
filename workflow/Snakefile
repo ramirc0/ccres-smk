@@ -1,12 +1,17 @@
 
 include: "rules/common.smk"
 include: "rules/inputs.smk"
+include: "rules/dhs.smk"
+include: "rules/tf.smk"
 
 
 rule all:
     input:
-        [
-            f"{INPUTS}/{genome}/{name}"
+        lambda w: [
+            path
             for genome in GENOMES
-            for name in config["sources"][genome]
+            for path in [
+                f"{OUTDIR}/{genome}/TF/{genome}-TF-List.Filtered.txt",
+                *processed_dhs(genome),
+            ]
         ],

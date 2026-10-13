@@ -8,3 +8,5 @@ convention = "numpy"
 # "all" minus the codes after it: extended summary, examples, see also.
 [tool.numpydoc_validation]
 checks = ["all", "ES01", "EX01", "SA01"]
+# Class docstrings document the constructor.
+exclude = ['\.__init__$']

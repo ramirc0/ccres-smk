@@ -90,6 +90,23 @@ def first_8_columns(line):
     return b"\t".join(strip(line).split(b"\t")[:8])
 
 
+def except_column_6(line):
+    """Drop field 6 of a line.
+
+    Parameters
+    ----------
+    line : bytes
+        One line.
+
+    Returns
+    -------
+    list of bytes
+        Fields other than field 6.
+    """
+    fields = strip(line).split(b"\t")
+    return fields[:5] + fields[6:]
+
+
 def sort_lists(line):
     """Sort the ;-joined items of the set-valued columns of a line.
 
@@ -137,7 +154,7 @@ def difference(ours, ref, mode, tmp_path):
     ours, ref : pathlib.Path
         Our file and the reference file.
     mode : str
-        `bytes`, `ref-cols-1-8`, `sorted-lists` or `bigbed`.
+        `bytes`, `ref-cols-1-8`, `except-col-6`, `sorted-lists` or `bigbed`.
     tmp_path : pathlib.Path
         Scratch directory.
 
@@ -156,6 +173,8 @@ def difference(ours, ref, mode, tmp_path):
         return first_difference(ours, ref, strip, strip) or "same lines, other bytes"
     if mode == "ref-cols-1-8":
         return first_difference(ours, ref, strip, first_8_columns)
+    if mode == "except-col-6":
+        return first_difference(ours, ref, except_column_6, except_column_6)
     return first_difference(ours, ref, sort_lists, sort_lists)
 
 

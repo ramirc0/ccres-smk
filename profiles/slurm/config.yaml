@@ -24,6 +24,12 @@ set-threads:
   verify: 8
 
 set-resources:              # tune from benchmarks/ TSVs after a real run
+  call_dhs:
+    mem_mb: 8000 * attempt
+    runtime: 30m
+  process_dhs:
+    mem_mb: 4000 * attempt
+    runtime: 30m
   verify:
     slurm_partition: 4hours
     mem_mb: 4000 * attempt

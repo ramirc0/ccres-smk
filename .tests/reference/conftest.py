@@ -11,15 +11,25 @@ import pytest
 
 REFERENCE = "/data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry"
 
-# step -> (glob under ours, reference path template, mode).
+# step -> (glob under ours, reference path template, mode[, genomes]).
 # Templates take {g} (genome), {name} (our basename) and {stem} (our basename
 # without its last suffix).
 STEPS = {
+    # The release's lists were edited later. hg38's Filtered-Mod keeps the May
+    # 2022 rows in columns 1-8. mm10's Filtered.txt differs only in column 6,
+    # where a 2023 edit turned "," into ":".
     "tf_list": [
         (
             "TF/{g}-TF-List.Filtered.txt",
             "{g}-TF/{g}-TF-List.Filtered-Mod.txt",
             "ref-cols-1-8",
+            {"hg38"},
+        ),
+        (
+            "TF/{g}-TF-List.Filtered.txt",
+            "{g}-TF/{g}-TF-List.Filtered.txt",
+            "except-col-6",
+            {"mm10"},
         ),
     ],
     "dhs": [
@@ -117,7 +127,9 @@ def pytest_generate_tests(metafunc):
     for ours_dir in sorted(p for p in results.glob("*") if p.is_dir()):
         g = ours_dir.name
         for step, rules in STEPS.items():
-            for pattern, template, mode in rules:
+            for pattern, template, mode, *genomes in rules:
+                if genomes and g not in genomes[0]:
+                    continue
                 for path in sorted(ours_dir.glob(pattern.format(g=g))):
                     ref = template.format(g=g, name=path.name, stem=path.stem)
                     params.append(
