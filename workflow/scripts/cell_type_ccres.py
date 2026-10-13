@@ -71,9 +71,6 @@ def build_parser():
     )
     p.add_argument("--encode-root", help="Local ENCODE mirror.")
     p.add_argument("--download-dir", help="Downloaded ENCODE files.")
-    p.add_argument(
-        "--exclude", nargs="*", default=[], help="TF experiments the run lacked."
-    )
     p.add_argument("-o", "--output", required=True, help="BED.gz to write and index.")
     return p
 
@@ -270,8 +267,7 @@ def tf_summits(args):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed flags with tf_list, biosample, encode_root, download_dir and
-        exclude.
+        Parsed flags with tf_list, biosample, encode_root and download_dir.
 
     Returns
     -------
@@ -282,7 +278,7 @@ def tf_summits(args):
         rows = [line.rstrip("\n").split("\t") for line in f]
     parts = []
     for row in rows:
-        if row[-1].split()[-1] != args.biosample or row[0] in args.exclude:
+        if row[-1].split()[-1] != args.biosample:
             continue
         path = _encode.encode_path(
             args.encode_root, args.download_dir, row[0], row[1], "bed.gz"

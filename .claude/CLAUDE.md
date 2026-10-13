@@ -48,8 +48,8 @@ pixi run snakemake --profile profiles/local <target>
 
 - Step 8: calculate-center-distance.py keeps `|d| < 200`. `PLS-Gene-List.hg38-V4.txt` also keeps the 93
   hg38 pairs at exactly 200 bp. The port follows the release.
-- Steps 3 and 7: ENCSR008LHT's peak file reached the mirror in June 2022, after the run. Its peaks are
-  missing from `tmp.summits`. `tf_excluded` leaves it out.
+- Step 3 (May 5) lacked ENCSR008LHT's peak file, which reached the mirror in June 2022. `tf_excluded`
+  leaves it out of `tmp.summits`. Step 7 (May 19) used its peaks: SK-N-SH matches `REF` only with them.
 
 ### Quirks kept
 

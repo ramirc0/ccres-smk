@@ -119,12 +119,11 @@ def cell_type_inputs(w):
     }
     if row[0] != mcl.MISSING and row[-1] == "yes":
         tf_list = frozen(w.genome, "TF-List.Cell-Type.txt")
-        excluded = config["genomes"][w.genome]["tf_excluded"]
         inputs["tf_list"] = tf_list
         inputs["tf_peaks"] = [
             ancient(encode_file(r[0], r[1], "bed.gz"))
             for r in read_rows(tf_list)
-            if r[-1].split()[-1] == row[8] and r[0] not in excluded
+            if r[-1].split()[-1] == row[8]
         ]
     return inputs
 
@@ -155,7 +154,6 @@ def cell_type_flags(w, input):
             "--biosample", row[8],
             "--encode-root", ENCODE_ROOT,
             "--download-dir", DOWNLOAD_DIR,
-            "--exclude", *config["genomes"][w.genome]["tf_excluded"],
         ]
     return flags
 
