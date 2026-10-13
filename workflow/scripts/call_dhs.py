@@ -18,6 +18,7 @@ from decimal import Decimal
 import _bed
 import numpy as np
 import polars as pl
+from numba import njit
 
 KEEP = np.iinfo(np.int64).max  # order of an FDR that passes every threshold
 GAP = 1  # bedtools merge -d
@@ -103,30 +104,105 @@ class Track:
         self.orders = per_value(df["fdr"], fdr_order, pl.Int64)
         self.fdrs = _bed.python_floats(df["fdr"])
 
-    def merged(self, rows):
-        """Merge positions like `bedtools merge -d 1 -c 5 -o min`.
 
-        Parameters
-        ----------
-        rows : numpy.ndarray
-            Indices of the kept positions, increasing.
+@njit(cache=True)
+def _sweep(codes, starts, ends, fdrs, orders, thresholds):
+    """Run the threshold sweep over positions sorted by chromosome and start.
 
-        Returns
-        -------
-        tuple of (dict of str to numpy.ndarray, numpy.ndarray)
-            Code, start, end and min FDR of each merged interval, in order, and
-            the interval index of each row.
-        """
-        codes, starts, ends = self.codes[rows], self.starts[rows], self.ends[rows]
-        cluster = _bed.merge_clusters(codes, starts, ends, GAP)
-        first = np.flatnonzero(np.diff(cluster, prepend=-1))
-        merged = {
-            "code": codes[first],
-            "start": starts[first],
-            "end": np.maximum.reduceat(ends, first) if len(rows) else ends,
-            "fdr": np.minimum.reduceat(self.fdrs[rows], first) if len(rows) else ends,
-        }
-        return merged, cluster
+    At each threshold the positions above it merge like `bedtools merge -d 1
+    -c 5 -o min`. `rows` holds the remaining positions and is compacted in
+    place, so it stays in file order.
+
+    Parameters
+    ----------
+    codes, starts, ends : numpy.ndarray
+        Chromosome codes and coordinates, int64.
+    fdrs : numpy.ndarray
+        FDR of each position, float64.
+    orders : numpy.ndarray
+        FDR order of each position, int64.
+    thresholds : numpy.ndarray
+        Thresholds in sweep order, int64.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        First row, end and min FDR of each DHS in calling order, then of each
+        interval still over MAX_DHS_LENGTH after the last threshold.
+    """
+    n = len(codes)
+    rows = np.arange(n)
+    first = np.empty(n, np.int64)
+    end = np.empty(n, np.int64)
+    fdr = np.empty(n, np.float64)
+    begin = np.empty(n + 1, np.int64)
+    dhs_first = np.empty(1024, np.int64)
+    dhs_end = np.empty(1024, np.int64)
+    dhs_fdr = np.empty(1024, np.float64)
+    called = 0
+    count = 0
+    for j in thresholds:
+        m = 0
+        count = 0
+        reach = 0
+        for r in rows:
+            if orders[r] <= j:
+                continue
+            if starts[r] == ends[r]:
+                raise ValueError("Zero-length position: bedtools would widen it.")
+            if m > 0:
+                previous = rows[m - 1]
+                if codes[r] < codes[previous] or (
+                    codes[r] == codes[previous] and starts[r] < starts[previous]
+                ):
+                    raise ValueError("Positions are not sorted.")
+            if m == 0 or codes[r] != codes[first[count - 1]] or starts[r] > reach + GAP:
+                first[count] = r
+                end[count] = ends[r]
+                fdr[count] = fdrs[r]
+                begin[count] = m
+                count += 1
+                reach = ends[r]
+            else:
+                end[count - 1] = max(end[count - 1], ends[r])
+                reach = max(reach, ends[r])
+                # np.minimum propagates NaN.
+                if fdrs[r] < fdr[count - 1] or fdrs[r] != fdrs[r]:
+                    fdr[count - 1] = fdrs[r]
+            rows[m] = r
+            m += 1
+        begin[count] = m
+        kept = 0
+        for i in range(count):
+            length = end[i] - starts[first[i]]
+            if MIN_LENGTH <= length <= MAX_DHS_LENGTH:
+                if called == len(dhs_first):
+                    dhs_first = np.concatenate((dhs_first, np.empty_like(dhs_first)))
+                    dhs_end = np.concatenate((dhs_end, np.empty_like(dhs_end)))
+                    dhs_fdr = np.concatenate((dhs_fdr, np.empty_like(dhs_fdr)))
+                dhs_first[called] = first[i]
+                dhs_end[called] = end[i]
+                dhs_fdr[called] = fdr[i]
+                called += 1
+            elif length > MAX_DHS_LENGTH:
+                size = begin[i + 1] - begin[i]
+                rows[kept : kept + size] = rows[begin[i] : begin[i + 1]]
+                kept += size
+        rows = rows[:kept]
+        if not kept:
+            break
+    wide = np.array(
+        [i for i in range(count) if end[i] - starts[first[i]] > MAX_DHS_LENGTH],
+        dtype=np.int64,
+    )
+    return (
+        dhs_first[:called],
+        dhs_end[:called],
+        dhs_fdr[:called],
+        first[wide],
+        end[wide],
+        fdr[wide],
+    )
 
 
 def sweep(track, min_p):
@@ -148,69 +224,47 @@ def sweep(track, min_p):
 
     Returns
     -------
-    tuple of (list of dict, dict)
-        DHSs in calling order, threshold by threshold, and the excluded
-        intervals.
+    tuple of (tuple of numpy.ndarray, tuple of numpy.ndarray)
+        First row, end and min FDR of the DHSs in calling order, threshold by
+        threshold, and of the excluded intervals.
     """
-    rows = np.arange(len(track.orders))
     changes = np.unique(track.orders[(track.orders >= 3) & (track.orders <= min_p)])
-    dhs = []
-    for j in [2, *changes.tolist()]:
-        rows = rows[track.orders[rows] > j]
-        merged, cluster = track.merged(rows)
-        length = merged["end"] - merged["start"]
-        dhs.append(_select(merged, (length >= MIN_LENGTH) & (length <= MAX_DHS_LENGTH)))
-        wide = length > MAX_DHS_LENGTH
-        rows = rows[wide[cluster]]
-        excluded = _select(merged, wide)
-        if not len(rows):
-            break
-    return dhs, excluded
+    found = _sweep(
+        track.codes,
+        track.starts,
+        track.ends,
+        track.fdrs,
+        track.orders,
+        np.concatenate(([2], changes)),
+    )
+    return found[:3], found[3:]
 
 
-def _select(intervals, mask):
-    """Keep the intervals where `mask` is true.
-
-    Parameters
-    ----------
-    intervals : dict of str to numpy.ndarray
-        Interval arrays.
-    mask : numpy.ndarray
-        Flag per interval.
-
-    Returns
-    -------
-    dict of str to numpy.ndarray
-        Selected intervals.
-    """
-    return {k: v[mask] for k, v in intervals.items()}
-
-
-def write(track, parts, path):
+def write(track, intervals, path):
     """Write intervals as chrom, start, end and min FDR, printed as bedtools does.
 
     Parameters
     ----------
     track : Track
-        Source of the chromosome names.
-    parts : list of dict
-        Intervals, written in order.
+        Source of the chromosome names and starts.
+    intervals : tuple of numpy.ndarray
+        First row, end and min FDR of each interval, written in order.
     path : str
         BED to write.
     """
+    first, end, fdr = intervals
+    rows = zip(
+        track.codes[first].tolist(),
+        track.starts[first].tolist(),
+        end.tolist(),
+        fdr.tolist(),
+    )
     with open(path, "w") as f:
-        for part in parts:
-            rows = zip(
-                part["code"].tolist(),
-                part["start"].tolist(),
-                part["end"].tolist(),
-                part["fdr"].tolist(),
-            )
-            # bedtools prints with std::setprecision(10).
-            f.writelines(
-                f"{track.chroms[code]}\t{start}\t{end}\t{fdr:.10g}\n"
-                for code, start, end, fdr in rows
-            )
+        # bedtools prints with std::setprecision(10).
+        f.writelines(
+            f"{track.chroms[code]}\t{start}\t{stop}\t{value:.10g}\n"
+            for code, start, stop, value in rows
+        )
 
 
 def main(argv=None):
@@ -227,7 +281,7 @@ def main(argv=None):
     )
     dhs, excluded = sweep(track, args.min_p)
     write(track, dhs, args.dhs)
-    write(track, [excluded], args.excluded)
+    write(track, excluded, args.excluded)
 
 
 if __name__ == "__main__":
