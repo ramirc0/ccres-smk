@@ -70,7 +70,8 @@ def read_tsv(path, columns):
         return pl.DataFrame(schema=dict.fromkeys(columns, pl.String))
     if df.width != len(columns):
         raise ValueError(f"{path}: {df.width} columns, expected {len(columns)}.")
-    return df.rename(dict(zip(df.columns, columns)))
+    # read_csv returns thousands of chunks per column, which make gathers slow.
+    return df.rename(dict(zip(df.columns, columns))).rechunk()
 
 
 def lines(df):
