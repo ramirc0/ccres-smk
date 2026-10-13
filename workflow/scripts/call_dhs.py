@@ -104,7 +104,7 @@ class Track:
         self.fdrs = _bed.python_floats(df["fdr"])
 
     def merged(self, rows):
-        """Merge positions like `bedtools merge -d 1 -c 5 -o min`, then drop < 50 bp.
+        """Merge positions like `bedtools merge -d 1 -c 5 -o min`.
 
         Parameters
         ----------
@@ -113,8 +113,9 @@ class Track:
 
         Returns
         -------
-        dict of str to numpy.ndarray
-            Code, start, end and min FDR of each merged interval, in order.
+        tuple of (dict of str to numpy.ndarray, numpy.ndarray)
+            Code, start, end and min FDR of each merged interval, in order, and
+            the interval index of each row.
         """
         codes, starts, ends = self.codes[rows], self.starts[rows], self.ends[rows]
         cluster = _bed.merge_clusters(codes, starts, ends, GAP)
@@ -125,57 +126,18 @@ class Track:
             "end": np.maximum.reduceat(ends, first) if len(rows) else ends,
             "fdr": np.minimum.reduceat(self.fdrs[rows], first) if len(rows) else ends,
         }
-        keep = merged["end"] - merged["start"] >= MIN_LENGTH
-        return {k: v[keep] for k, v in merged.items()}
-
-
-class Called:
-    """DHSs called so far: disjoint intervals, kept sorted for overlap queries."""
-
-    def __init__(self):
-        self.parts = []
-        self.starts = np.array([], dtype=np.int64)
-        self.ends = np.array([], dtype=np.int64)
-
-    def overlapping(self, intervals):
-        """Flag intervals that overlap a called DHS, as `bedtools intersect -u`.
-
-        Parameters
-        ----------
-        intervals : dict of str to numpy.ndarray
-            Merged intervals.
-
-        Returns
-        -------
-        numpy.ndarray
-            Flag per interval.
-        """
-        s = _bed.axis(intervals["code"], intervals["start"])
-        e = _bed.axis(intervals["code"], intervals["end"])
-        # DHSs are disjoint, so the last one starting before e has the largest end.
-        last = np.searchsorted(self.starts, e, side="left") - 1
-        hit = last >= 0
-        hit[hit] = self.ends[last[hit]] > s[hit]
-        return hit
-
-    def add(self, intervals):
-        """Append intervals that overlap no called DHS.
-
-        Parameters
-        ----------
-        intervals : dict of str to numpy.ndarray
-            Merged intervals, disjoint from the called DHSs.
-        """
-        self.parts.append(intervals)
-        s = _bed.axis(intervals["code"], intervals["start"])
-        e = _bed.axis(intervals["code"], intervals["end"])
-        at = np.searchsorted(self.starts, s)
-        self.starts = np.insert(self.starts, at, s)
-        self.ends = np.insert(self.ends, at, e)
+        return merged, cluster
 
 
 def sweep(track, min_p):
     """Run the threshold sweep.
+
+    Merged intervals only split as the threshold rises. An interval of 50-350 bp
+    becomes a DHS, and its pieces could only overlap it later. An interval under
+    50 bp only has shorter pieces, which the original dropped. Both leave the
+    sweep. So no remaining interval overlaps a DHS, and each remaining one of
+    50-350 bp is a new DHS. The intervals still over 350 bp after the last
+    threshold are the excluded ones.
 
     Parameters
     ----------
@@ -190,17 +152,20 @@ def sweep(track, min_p):
         DHSs in calling order, threshold by threshold, and the excluded
         intervals.
     """
-    rows = np.flatnonzero(track.orders > 2)
-    merged = track.merged(rows)
-    called = Called()
-    called.add(_select(merged, merged["end"] - merged["start"] <= MAX_DHS_LENGTH))
+    rows = np.arange(len(track.orders))
     changes = np.unique(track.orders[(track.orders >= 3) & (track.orders <= min_p)])
-    for j in changes:
+    dhs = []
+    for j in [2, *changes.tolist()]:
         rows = rows[track.orders[rows] > j]
-        merged = track.merged(rows)
-        new = _select(merged, ~called.overlapping(merged))
-        called.add(_select(new, new["end"] - new["start"] <= MAX_DHS_LENGTH))
-    return called.parts, _select(merged, ~called.overlapping(merged))
+        merged, cluster = track.merged(rows)
+        length = merged["end"] - merged["start"]
+        dhs.append(_select(merged, (length >= MIN_LENGTH) & (length <= MAX_DHS_LENGTH)))
+        wide = length > MAX_DHS_LENGTH
+        rows = rows[wide[cluster]]
+        excluded = _select(merged, wide)
+        if not len(rows):
+            break
+    return dhs, excluded
 
 
 def _select(intervals, mask):
