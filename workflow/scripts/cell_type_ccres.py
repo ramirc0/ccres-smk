@@ -244,12 +244,13 @@ def sorted_lines(lines, text_key, numeric_key=None):
     """
     if not lines:
         return []
-    fields = [line.split("\t") for line in lines]
+    line = pl.Series(lines)
+    fields = line.str.split("\t").list
     table = pl.DataFrame(
         {
-            "text": [f[text_key] for f in fields],
-            "line": lines,
-            **({"number": [f[numeric_key] for f in fields]} if numeric_key else {}),
+            "text": fields.get(text_key),
+            "line": line,
+            **({"number": fields.get(numeric_key)} if numeric_key else {}),
         }
     )
     order = _bed.gnu_sort(
