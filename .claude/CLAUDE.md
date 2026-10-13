@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 Snakemake port of the ENCODE4 cCRE pipeline (Moore lab, steps 0-8). Outputs MUST match the May 2022 V7
-release byte for byte, except the deviations listed in README.md. README.md holds the layout, idioms
-and style conventions. Follow it.
+release byte for byte, except the deviations below. README.md holds the layout, idioms and style
+conventions. Follow it.
 
 ## Commands
 
@@ -25,10 +25,63 @@ pixi run snakemake --profile profiles/local <target>
 ## Fidelity
 
 - Every difference from the reference MUST be reported with evidence before it is accepted.
-- Keep deterministic bugs of the original. Record each in the README quirks ledger.
+- Keep deterministic bugs of the original. Record each under Quirks kept.
 - Fix non-determinism and host dependence (set order, glob order, FMA). The fix becomes the new baseline.
 - Logic lives in Python. External binaries stay only where output bytes depend on them.
 - The reference tree belongs to another user and keeps changing. Check a file's mtime before trusting it.
+
+### Deviations from the release
+
+- D1. filter-tf-rpeaks.py joined a TF cluster's targets, biosamples and experiments in set() order. The
+  port sorts them. Affects `TF-Clusters.txt`, `tmp.no-overlap` and `rTFBS-Summary.txt`.
+- D2. Step 7 writes bgzipped, tabix-indexed BED. It writes no bigBed.
+- D3. Step 1 writes `Processed-DHSs/<signal>.<row>.bed`, not `output.<signal>.<row>`. Step 2 still
+  concatenates them in the en_US order of the old names.
+- D4. `REF`'s ATAC files come from a Sep 2023 run on glibc's FMA log, which reproduces them exactly. The
+  port keeps the May 2022 non-FMA log. About 150 of 2.9M z-scores per file move by at most 9e-16. Signal
+  and rank columns match. Steps 6-8 do not read ATAC.
+- D5. `REF` hg38 `Individual-Files` mix two master lists. 1,675 files date from May 17-19, 4 from May 26,
+  after a `DNase-List.txt` edit. The port follows the final list. `ENCFF346LEZ_ENCFF118OBT_ENCFF536VOI.bed`
+  is stale. `ENCFF269VAY.bigBed` has no `.bed`. The port's two H3K4me3 `NA` biosamples have no `REF` file.
+
+### Release over the published scripts
+
+- Step 8: calculate-center-distance.py keeps `|d| < 200`. `PLS-Gene-List.hg38-V4.txt` also keeps the 93
+  hg38 pairs at exactly 200 bp. The port follows the release.
+- Steps 3 and 7: ENCSR008LHT's peak file reached the mirror in June 2022, after the run. Its peaks are
+  missing from `tmp.summits`. `tf_excluded` leaves it out.
+
+### Quirks kept
+
+1. Step 0 sweeps up to 1E-4942. Both genomes have FDR orders 4943 and 4944, which no threshold filters.
+2. Step 0 prints an FDR without an exponent as `'%.2E'` before reading its order (0.009999 reads as
+   order 2). A `+` exponent, as in 0, passes every threshold.
+3. bedtools merge prints the min FDR with 10 significant digits. An FDR below the double range, such as
+   1e-4944, prints as 0.
+4. Step 1 sorts names with `sort -k4,4`, whose key includes the tab before field 4.
+5. Step 2's `grep -v chrEBV` and `grep -v chrM` drop any line containing those strings.
+6. make-region-accession.py keys earlier regions by chrom, start and end joined without separators.
+   Distinct coordinates can collide.
+7. Step 3 places a resized peak's summit at the new start plus the original offset.
+8. Step 3's awk compares a non-numeric FRiP such as NA with 0.003 as text, so it passes.
+9. Step 4's rank loop starts from `before=0`. A top z-score of exactly 0 would rank 0.
+10. Two hg38 H3K4me3 rows list the file `NA`. Their z-score files are empty. Step 5 skips them. Step 7
+    puts `NA` in their biosamples' file names.
+11. In steps 6-7, `awk 'FNR==NR {x[$1];next} ...' first second` with an empty first file selects nothing,
+    even under `!(key in x)`.
+12. Step 7's No-DNase branch: an empty no1 or no2 falls back to the whole group or to no1. One cCRE can
+    then get two rows.
+13. Same branch: a mark whose above-1.64 lines miss every classified cCRE empties the file (quirk 11, twice).
+14. Step 7's `blank.txt` line, `blank blank`, passes `$2 > 1.64` as text. It matches no cCRE.
+15. calculate-center-distance.py's `elif` never fires. The first closest TSS bedtools prints wins.
+
+### Host dependence removed
+
+- Collation: `_bed` sorts with glibc's strxfrm under en_US.UTF-8. It checks at import that glibc still
+  orders a probe set as the release did.
+- log: `_zscore` ports glibc 2.39's non-FMA `log` to plain double operations. It matches non-FMA glibc on
+  all 10,800,000 six-digit values in [1e-6, 1e6).
+- Sums: numpy < 2.3 summed in 8192-element buffers. `_zscore` transliterates the buffered pairwise sum.
 
 ## Reference release (`REF`)
 
@@ -46,8 +99,6 @@ pixi run snakemake --profile profiles/local <target>
   - `Previous-Versions/cCREs.*.bed.gz` gained V4 rows (2025). mm10 mark lists changed in 2025, the mm10
     hotspot list in 2023. `REF/maxZ/` was rebuilt on GENCODE47 (2025).
 - hg38 `REF` has no `tmp.bed` or `tmp.no-overlap`. The script's `rDHS-PreAltius.txt` is `rDHS-PreStam.txt`.
-- D5: 1,675 hg38 `Individual-Files` date from May 17-19, 4 from May 26. `ENCFF346LEZ_ENCFF118OBT_ENCFF536VOI.bed`
-  is stale. `ENCFF269VAY.bigBed` has no `.bed`.
 
 ## Gotchas
 
