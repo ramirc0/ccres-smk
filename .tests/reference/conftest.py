@@ -45,12 +45,13 @@ STEPS = {
         ("rDHS/{g}-rDHS-Filtered-Summary.txt", "{g}-rDHS/{name}", "bytes"),
         ("rDHS/{g}-rDHS-Filtered.bed", "{g}-rDHS/{name}", "bytes"),
     ],
+    # The release keeps no hg38 tmp.bed or tmp.no-overlap.
     "tf": [
-        ("TF/tmp.bed", "{g}-TF/{name}", "bytes"),
+        ("TF/tmp.bed", "{g}-TF/{name}", "bytes", {"mm10"}),
         ("TF/tmp.summits", "{g}-TF/{name}", "bytes"),
         ("TF/tmp.rPeaks", "{g}-TF/{name}", "bytes"),
         ("TF/{g}-TF-Clusters.txt", "{g}-TF/{name}", "sorted-lists"),
-        ("TF/tmp.no-overlap", "{g}-TF/{name}", "sorted-lists"),
+        ("TF/tmp.no-overlap", "{g}-TF/{name}", "sorted-lists", {"mm10"}),
         ("TF/{g}-rTFBS-Summary.txt", "{g}-TF/{name}", "sorted-lists"),
         ("TF/{g}-rTFBS.bed", "{g}-TF/{name}", "bytes"),
     ],
