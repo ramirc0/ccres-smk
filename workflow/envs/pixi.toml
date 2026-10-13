@@ -1,0 +1,31 @@
+[workspace]
+name = "ccres-smk-envs"
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.13.*"
+numpy = ">=2.3,<3"
+polars = ">=1.30"
+blake3 = ">=1.0"
+# Output bytes depend on these binaries. Bump them only with a full re-verification.
+ucsc-bigwigaverageoverbed = "==482"
+ucsc-bedtobigbed = "==482"
+ucsc-bigbedtobed = "==482"
+htslib = ">=1.21"
+
+[feature.test.dependencies]
+pytest = ">=8"
+pytest-xdist = ">=3"
+
+# bedtools 2.30.0 ran the May 2022 release. Unit tests use it as the oracle. Rules never call it.
+# Its zlib pin conflicts with the UCSC tools, so it gets its own env.
+[feature.test.activation.env]
+BEDTOOLS = "$PIXI_PROJECT_ROOT/.pixi/envs/oracle/bin/bedtools"
+
+[feature.oracle.dependencies]
+bedtools = "==2.30.0"
+
+[environments]
+test = ["test"]
+oracle = { features = ["oracle"], no-default-feature = true }

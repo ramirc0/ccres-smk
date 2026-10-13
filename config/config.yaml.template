@@ -1,0 +1,57 @@
+outdir: data/results
+pixi_env: default
+run_id: v7               # outputs go under <outdir>/<run_id>/<genome>/; override per run
+
+inputs_dir: data/inputs                      # frozen inputs, checked against config/inputs.b3
+encode_root: /data/projects/encode/data      # ENCODE mirror, <exp>/<file>.<ext>
+download_dir: data/encode                    # same layout, for files missing from the mirror
+
+# Constants hardcoded in the original scripts. No published code derives them.
+# min_p: minP in 0_Call-DHSs.sh (last FDR threshold, 1E-<min_p>). That script
+#   is hardcoded to hg38, so the mm10 value is unverified.
+# dhs_signal_cutoff: 2_Create-rDHSs.sh, "10% of 10,000,000 randomly selected
+#   DHSs". The sample and its seed were not kept.
+genomes:
+  hg38:
+    min_p: 4942
+    dhs_signal_cutoff: 0.145873
+  mm10:
+    min_p: 4942
+    dhs_signal_cutoff: 0.203923
+
+# Frozen input name -> source file(s). freeze_input copies a single source.
+# The two derived inputs filter their sources (see workflow/scripts/freeze_input.py).
+sources:
+  hg38:
+    Hotspot-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-rDHS/hg38-Hotspot-List.txt
+    DNase-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/DNase-List.txt
+    H3K4me3-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/H3K4me3-List.txt
+    H3K27ac-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/H3K27ac-List.txt
+    CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/CTCF-List.txt
+    ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/ATAC-List.txt
+    TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-TF/hg38-TF-List.All.txt
+    TF-List.Cell-Type.txt:
+      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-TF/hg38-TF-List.Filtered-Mod.txt
+      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/Cell-Type-Specific/Master-Cell-List.txt
+    cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-cDHS/Altius-cDHSs.DAC-hg38.bed
+    rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.hg38.bed.gz
+    cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.hg38.bed.gz
+    TSS.Basic.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/GENCODE40/TSS.Basic.bed
+    TSS.Basic.4K.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/GENCODE40/TSS.Basic.4K.bed
+    chromInfo.txt: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/chromInfo.txt
+    cres.as: /data/zusers/moorej3/moorej.ghpcc.project/Reference/cres.as
+  mm10:
+    Hotspot-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-rDHS/rDHS-cDHS-List.05-04-2022.mm10.txt
+    DNase-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/DNase-List.txt
+    H3K4me3-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/H3K4me3-List.txt
+    H3K27ac-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/H3K27ac-List.txt
+    CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/CTCF-List.txt
+    ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/ATAC-List.txt
+    TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/mm10-TF-List.All.txt
+    cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-cDHS/Altius-cDHSs.DAC-mm10.bed
+    rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.mm10.bed.gz
+    cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.mm10.bed.gz
+    TSS.Basic.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/GENCODEM25/TSS.Basic.bed
+    TSS.Basic.4K.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/GENCODEM25/TSS.Basic.4K.bed
+    chromInfo.txt: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/ChromInfo.txt
+    cres.as: /data/zusers/moorej3/moorej.ghpcc.project/Reference/cres.as

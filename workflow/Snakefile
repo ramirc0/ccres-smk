@@ -1,0 +1,12 @@
+
+include: "rules/common.smk"
+include: "rules/inputs.smk"
+
+
+rule all:
+    input:
+        [
+            f"{INPUTS}/{genome}/{name}"
+            for genome in GENOMES
+            for name in config["sources"][genome]
+        ],
