@@ -10,7 +10,7 @@ FAR = 2000
 TSS = ["chrom", "start", "end", "transcript", "score", "strand", "gene"]
 
 
-def awk_in(first, second, negate=False):
+def awk_in(first, second, negate=False, field=0):
     """Select like `awk 'FNR==NR {x[$k];next} (key in x)' first second`.
 
     awk reads an empty first file as no file, so it takes the second file as
@@ -22,10 +22,12 @@ def awk_in(first, second, negate=False):
     first : list of str
         Keys of the first file, in file order.
     second : list
-        Items of the second file. An item is a key, or a tuple whose first
-        element is the key.
+        Items of the second file: all keys, or all sequences such as tuples
+        and rows that hold the key at `field`.
     negate : bool
         Select the items whose key is not in `first`, as `!(key in x)`.
+    field : int
+        Position of the key in a sequence item.
 
     Returns
     -------
@@ -35,9 +37,9 @@ def awk_in(first, second, negate=False):
     if not first:
         return []
     keys = set(first)
-    return [
-        s for s in second if ((s[0] if isinstance(s, tuple) else s) in keys) != negate
-    ]
+    if second and isinstance(second[0], str):
+        return [s for s in second if (s in keys) != negate]
+    return [s for s in second if (s[field] in keys) != negate]
 
 
 def above(lines):

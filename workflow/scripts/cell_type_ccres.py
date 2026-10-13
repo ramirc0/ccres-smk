@@ -185,7 +185,7 @@ def master_rows(master, accessions):
     list of list of str
         Selected rows.
     """
-    return [r for _, r in awk_in(accessions, [(r[3], r) for r in master])]
+    return awk_in(accessions, master, field=3)
 
 
 def class_line(row, color, label):
@@ -393,12 +393,12 @@ def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
     lines += [class_line(r, DNASE_COLORS["CA-only"], "CA-only") for r in ca]
     lines = [drop_first(line) for line in lines]
     labelled = [line.split("\t")[3] for line in lines]
-    low = awk_in(labelled, [(r[4], r) for r in master], negate=True)
+    low = awk_in(labelled, master, negate=True, field=4)
     return lines + [
         "\t".join(
             [r[0], r[1], r[2], r[4], "0", ".", r[1], r[2], "225,225,225", "Low-DNase"]
         )
-        for _, r in low
+        for r in low
     ]
 
 
@@ -440,7 +440,7 @@ def no_dnase_lines(master, groups, k4, k27, ctcf, blank):
         lines = sorted_lines(lines, 0)
     lines = [drop_first(line.removesuffix(",").replace("#", "")) for line in lines]
     labelled = [line.split("\t")[3] for line in lines]
-    unclassified = awk_in(labelled, [(r[4], r) for r in master], negate=True)
+    unclassified = awk_in(labelled, master, negate=True, field=4)
     return lines + [
         "\t".join(
             [
@@ -456,7 +456,7 @@ def no_dnase_lines(master, groups, k4, k27, ctcf, blank):
                 "Unclassified",
             ]
         )
-        for _, r in unclassified
+        for r in unclassified
     ]
 
 
