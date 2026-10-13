@@ -87,7 +87,7 @@ pixi run snakemake --profile profiles/local <target>
 
 - `REF` is `/data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-{hg38,mm10}`. Read only.
 - `pixi run reference` takes `-m <step>` and `-k <genome>`. Steps: tf_list, dhs, rdhs, tf, anchors, signal,
-  maxz, ccres, cts, pls. Comparison modes absorb D1 (sorted lists), D2 (gunzip) and D4 (z within 1e-14).
+  maxz, ccres, cts, pls. Modes absorb D1 (sorted lists) and D4 (z within 1e-14). `.gz` outputs stream decompressed.
 - `data/manifests/2026-10-13/` holds sizes, mtimes and MD5s of `REF`. `md5sum -c --quiet md5.txt` there
   lists what changed since.
 - `REF` edits after May 2022, which the test or the frozen inputs absorb:

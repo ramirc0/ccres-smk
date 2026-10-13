@@ -4,7 +4,6 @@ Select a step with `-m <step>` and a genome with `-k <genome>`.
 """
 
 import gzip
-import shutil
 from pathlib import Path
 
 # Columns 5-7 hold ;-joined sets. The original printed them in set() order.
@@ -13,26 +12,40 @@ LIST_COLUMNS = (4, 5, 6)
 Z_TOLERANCE = 1e-14
 
 
+def read_ours(path):
+    """Open our file as a byte stream, decompressing gzip on the fly.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Our file. A `.gz` suffix marks gzip or bgzip.
+
+    Returns
+    -------
+    io.BufferedIOBase
+        Stream of the uncompressed bytes.
+    """
+    return gzip.open(path, "rb") if path.suffix == ".gz" else open(path, "rb")
+
+
 def same_bytes(a, b):
-    """Return whether two files have identical bytes.
+    """Return whether our file holds the bytes of the reference file.
 
     Parameters
     ----------
     a, b : pathlib.Path
-        Files to compare.
+        Our file, read through `read_ours`, and the reference file.
 
     Returns
     -------
     bool
         True if the contents are equal.
     """
-    if a.stat().st_size != b.stat().st_size:
-        return False
-    with open(a, "rb") as fa, open(b, "rb") as fb:
-        while chunk := fa.read(1 << 24):
-            if chunk != fb.read(1 << 24):
-                return False
-    return True
+    with read_ours(a) as fa, open(b, "rb") as fb:
+        while (chunk := fa.read(1 << 24)) == fb.read(1 << 24):
+            if not chunk:
+                return True
+    return False
 
 
 def first_difference(a, b, normalize_a, normalize_b):
@@ -41,7 +54,7 @@ def first_difference(a, b, normalize_a, normalize_b):
     Parameters
     ----------
     a, b : pathlib.Path
-        Files to compare, ours first.
+        Our file, read through `read_ours`, and the reference file.
     normalize_a, normalize_b : callable
         Map a line of `a` or `b` to its comparable form.
 
@@ -50,7 +63,7 @@ def first_difference(a, b, normalize_a, normalize_b):
     str or None
         Description of the first difference, None if there is none.
     """
-    with open(a, "rb") as fa, open(b, "rb") as fb:
+    with read_ours(a) as fa, open(b, "rb") as fb:
         n = 0
         for n, (la, lb) in enumerate(zip(fa, fb), start=1):
             if normalize_a(la) != normalize_b(lb):
@@ -156,27 +169,7 @@ def sort_lists(line):
     return fields
 
 
-def gunzipped(path, out):
-    """Decompress a gzip or bgzip file.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Compressed file.
-    out : pathlib.Path
-        Text file to write.
-
-    Returns
-    -------
-    pathlib.Path
-        `out`.
-    """
-    with gzip.open(path, "rb") as f, open(out, "wb") as o:
-        shutil.copyfileobj(f, o)
-    return out
-
-
-def difference(ours, ref, mode, tmp_path):
+def difference(ours, ref, mode):
     """Describe how our file differs from the reference.
 
     Parameters
@@ -184,19 +177,13 @@ def difference(ours, ref, mode, tmp_path):
     ours, ref : pathlib.Path
         Our file and the reference file.
     mode : str
-        `bytes`, `ref-cols-1-8`, `except-col-6`, `z-close`, `sorted-lists` or
-        `gunzip`.
-    tmp_path : pathlib.Path
-        Scratch directory.
+        `bytes`, `ref-cols-1-8`, `except-col-6`, `z-close` or `sorted-lists`.
 
     Returns
     -------
     str or None
         First difference, None if the files match under `mode`.
     """
-    if mode == "gunzip":
-        ours = gunzipped(ours, tmp_path / "ours.bed")
-        mode = "bytes"
     if mode == "bytes":
         if same_bytes(ours, ref):
             return None
@@ -210,17 +197,15 @@ def difference(ours, ref, mode, tmp_path):
     return first_difference(ours, ref, sort_lists, sort_lists)
 
 
-def test_matches_reference(case, tmp_path):
+def test_matches_reference(case):
     """Our output equals its reference file under the case's mode.
 
     Parameters
     ----------
     case : tuple of (pathlib.Path, pathlib.Path, str)
         Our file, the reference file and the comparison mode.
-    tmp_path : pathlib.Path
-        Scratch directory.
     """
     ours, ref, mode = case
     assert Path(ref).exists(), f"no reference file {ref}"
-    detail = difference(ours, ref, mode, tmp_path)
+    detail = difference(ours, ref, mode)
     assert detail is None, detail

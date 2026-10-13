@@ -82,7 +82,7 @@ STEPS = {
         (
             "Cell-Type-Specific/Individual-Files/*.bed.gz",
             "Cell-Type-Specific/Individual-Files/{stem}",
-            "gunzip",
+            "bytes",
         ),
     ],
     # The release has no mm10 PLS gene list.
