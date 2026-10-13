@@ -103,7 +103,7 @@ def representatives(dhs):
     picks = _registry.representative_peaks(
         *coordinates(dhs, _bed.chrom_codes(dhs["chrom"])),
         _bed.python_floats(dhs["signal"]),
-        dhs["name"].cast(pl.Categorical).to_physical().to_numpy(),
+        dhs["name"],
     )
     return dhs[picks]
 

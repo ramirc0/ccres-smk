@@ -51,7 +51,7 @@ def main(argv=None):
         peaks["c2"].cast(pl.Int64).to_numpy(),
         peaks["c3"].cast(pl.Int64).to_numpy(),
         _bed.python_floats(peaks["c7"]),
-        peaks["c14"].cast(pl.Categorical).to_physical().to_numpy(),
+        peaks["c14"],
     )
     _bed.write_tsv(peaks[picks], args.output)
 

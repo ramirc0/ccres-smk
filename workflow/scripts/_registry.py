@@ -2,6 +2,7 @@
 
 import _bed
 import numpy as np
+import polars as pl
 
 GENOME_ID = {"hg19": "EH37", "hg38": "EH38", "mm10": "EM10"}
 MODE_ID = {"rDHS": "D", "cCRE": "E", "TF": "F"}
@@ -22,8 +23,8 @@ def representative_peaks(codes, starts, ends, signal, names):
         Chromosome codes and coordinates, in `sort -k1,1 -k2,2n` order.
     signal : numpy.ndarray
         Signal as float64, parsed as Python's float() parses the text.
-    names : numpy.ndarray
-        Integer code of each peak's name. Equal names share a code.
+    names : polars.Series
+        Name of each peak.
 
     Returns
     -------
@@ -33,7 +34,11 @@ def representative_peaks(codes, starts, ends, signal, names):
     """
     if np.isnan(signal).any():
         raise ValueError("NaN signal: Python's max() would depend on its position.")
-    unique_names = len(np.unique(names)) == len(names)
+    # Distinct hashes prove distinct names. A collision falls back to the exact count.
+    n = len(names)
+    unique_names = names.hash().n_unique() == n or names.n_unique() == n
+    if not unique_names:
+        name_codes = names.cast(pl.Categorical).to_physical().to_numpy()
     remaining = np.arange(len(codes))
     picks = []
     while len(remaining):
@@ -47,7 +52,9 @@ def representative_peaks(codes, starts, ends, signal, names):
         if unique_names:
             chosen = best
         else:
-            chosen = np.flatnonzero(np.isin(names[remaining], names[remaining[best]]))
+            chosen = np.flatnonzero(
+                np.isin(name_codes[remaining], name_codes[remaining[best]])
+            )
         picks.append(remaining[chosen])
         hit = _bed.overlaps_any((c, s, e), (c[chosen], s[chosen], e[chosen]))
         remaining = remaining[~hit]

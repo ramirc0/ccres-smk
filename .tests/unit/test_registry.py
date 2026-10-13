@@ -110,7 +110,7 @@ def test_representative_peaks(bedtools, original, tmp_path, seed, duplicate_name
         df["start"].cast(pl.Int64).to_numpy(),
         df["end"].cast(pl.Int64).to_numpy(),
         np.array([float(s) for s in df["signal"]]),
-        df["name"].rank("dense").to_numpy(),
+        df["name"],
     )
     ours = "".join(f"{line}\n" for line in _bed.lines(df[picks]).to_list())
     assert ours == original_loop(df, tmp_path, bedtools, original)
