@@ -15,6 +15,7 @@ rule all:
             for mark in MARKS
         ],
         [f"{OUTDIR}/{genome}/{genome}-PLS-Gene-List.txt" for genome in GENOMES],
+        [f"{OUTDIR}/{genome}/rDHS/{genome}-Constants.tsv" for genome in GENOMES],
         # Step 7 needs the frozen TF list of the release's TF-flagged biosamples.
         lambda w: [
             path

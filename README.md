@@ -52,7 +52,7 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 |---|---|---|---|
 | 0 | `call_dhs` | `rDHS/DHSs/<peak>.{DHSs,Excluded}.bed` | 0_Call-DHSs.sh |
 | 1 | `process_dhs` | `rDHS/Processed-DHSs/<signal>.<row>.bed` | 1_Process-DHSs.sh |
-| 2 | `combine_dhs`, `create_rdhs` | `rDHS/<g>-DHS-{All,Filtered}.bed`, `rDHS/<g>-rDHS-*` | 2_Create-rDHSs.sh |
+| 2 | `combine_dhs`, `create_rdhs`, `derive_constants` | `rDHS/<g>-DHS-{All,Filtered}.bed`, `rDHS/<g>-rDHS-*`, `rDHS/<g>-Constants.tsv` | 2_Create-rDHSs.sh |
 | 3 | `tf_list`, `tf_peaks`, `tf_rpeaks`, `tf_clusters` | `TF/` | 3_Curate-TF-Clusters.sh |
 | - | `anchors` | `<g>-Anchors.bed` | none (rDHSs + rTFBSs, sorted) |
 | 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.txt` | 4_Calculate-Signal-Zscores.sh |
@@ -65,6 +65,11 @@ Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where som
 that FDR order, since elsewhere the merged set repeats. It also drops each merged interval once it
 settles. An interval of 50-350 bp is a DHS, and one under 50 bp can only shrink, so neither changes
 the output again. The largest hotspot file (117M positions) takes under 90 s.
+
+Steps 0 and 2 hardcode `min_p` (the last FDR threshold, 1E-4942) and `dhs_signal_cutoff` (0.145873
+for hg38, 0.203923 for mm10). The run keeps the release values. `derive_constants` writes what the
+data give next to them: the largest FDR order in the hotspot files and the 10th percentile of the
+DHS-All signal.
 
 ## Inputs
 

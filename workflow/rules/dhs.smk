@@ -140,3 +140,43 @@ rule create_rdhs:
             --summary {output.summary:q} \
             --rdhs {output.rdhs:q}
         """
+
+
+# Reports the data-derived values of the hardcoded constants. The run keeps the
+# release values.
+rule derive_constants:
+    input:
+        hotspots=lambda w: frozen(w.genome, "Hotspot-List.txt"),
+        peaks=lambda w: [
+            ancient(encode_file(r[0], r[1], "bed.gz"))
+            for r in read_rows(frozen(w.genome, "Hotspot-List.txt"))
+        ],
+        dhs_all=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
+    output:
+        f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-Constants.tsv",
+    params:
+        encode_root=ENCODE_ROOT,
+        download_dir=DOWNLOAD_DIR,
+        min_p=lambda w: config["genomes"][w.genome]["min_p"],
+        cutoff=lambda w: config["genomes"][w.genome]["dhs_signal_cutoff"],
+    threads: 8
+    log:
+        f"{LOGDIR}/derive_constants/{{genome}}.txt",
+    benchmark:
+        f"{BENCHDIR}/derive_constants/{{genome}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        python {workflow.basedir:q}/scripts/derive_constants.py \
+            --hotspots {input.hotspots:q} \
+            --encode-root {params.encode_root:q} \
+            --download-dir {params.download_dir:q} \
+            --dhs-all {input.dhs_all:q} \
+            --min-p {params.min_p:q} \
+            --cutoff {params.cutoff:q} \
+            --threads {threads:q} \
+            --output {output:q}
+        """

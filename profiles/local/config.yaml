@@ -24,6 +24,7 @@ set-resources:              # tune from benchmarks/ TSVs after a real run
   process_dhs: {mem_mb: 4000}
   combine_dhs: {mem_mb: 100000}
   create_rdhs: {mem_mb: 64000}
+  derive_constants: {mem_mb: 32000}
   tf_peaks: {mem_mb: 16000}
   tf_rpeaks: {mem_mb: 128000}
   tf_clusters: {mem_mb: 128000}
