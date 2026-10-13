@@ -7,6 +7,7 @@ checksum is not recorded in the checksum file fails the job.
 import argparse
 import gzip
 import shutil
+from contextlib import ExitStack
 
 import blake3
 
@@ -54,7 +55,7 @@ def previous_ccres(src, out):
         o.writelines(line for line in f if line.rstrip("\n").split("\t")[5] != "V4")
 
 
-def cell_type_tf(tf_list, master, out):
+def cell_type_tf(tf_columns, master, out):
     """Write the TF experiments of the biosamples flagged TF=yes in May 2022.
 
     The step 7 TF list kept growing after the release. Its rows for the
@@ -62,13 +63,14 @@ def cell_type_tf(tf_list, master, out):
 
     Parameters
     ----------
-    tf_list : str
-        TF experiment list. The last column is the biosample.
+    tf_columns : list of str
+        TF experiment list, as files whose lines are joined side by side with
+        tabs. The last column is the biosample.
     master : str
         Master cell list of the release. Column 9 is the biosample, the last
         column `yes` or `no`.
     out : str
-        Rows of `tf_list` whose biosample is flagged `yes`, in file order.
+        Rows of the TF list whose biosample is flagged `yes`, in file order.
     """
     with open(master) as f:
         flagged = {
@@ -76,8 +78,12 @@ def cell_type_tf(tf_list, master, out):
             for fields in (line.rstrip("\n").split("\t") for line in f)
             if fields[-1] == "yes"
         }
-    with open(tf_list) as f, open(out, "w") as o:
-        o.writelines(line for line in f if line.rstrip("\n").split("\t")[-1] in flagged)
+    with ExitStack() as stack, open(out, "w") as o:
+        files = [stack.enter_context(open(path)) for path in tf_columns]
+        for parts in zip(*files, strict=True):
+            line = "\t".join(part.rstrip("\n") for part in parts)
+            if line.split("\t")[-1] in flagged:
+                o.write(f"{line}\n")
 
 
 def read_checksums(path):
@@ -114,8 +120,8 @@ def main(argv=None):
         (src,) = args.sources
         previous_ccres(src, args.output)
     else:
-        tf_list, master = args.sources
-        cell_type_tf(tf_list, master, args.output)
+        *tf_columns, master = args.sources
+        cell_type_tf(tf_columns, master, args.output)
 
     digest = blake3.blake3(max_threads=blake3.blake3.AUTO).update_mmap(args.output)
     digest = digest.hexdigest()

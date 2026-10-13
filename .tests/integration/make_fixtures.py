@@ -7,7 +7,8 @@ Run once from the repository root, after the frozen inputs exist:
 The lists are synthetic. Their rows point to real ENCODE files, and their
 biosample names are chosen so that every branch of step 7 runs: toy_tf (DNase
 and TF), toy_dnase (DNase, partial marks) and toy_nodnase (no DNase, an NA
-H3K4me3 file). The ENCODE mirror at /data/projects/encode/data must exist.
+H3K4me3 file). As in the real config, mm10 freezes its step 7 master list. The
+ENCODE mirror at /data/projects/encode/data must exist.
 """
 
 import gzip
@@ -21,6 +22,7 @@ import blake3
 HERE = Path(__file__).parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "workflow" / "scripts"))
+import master_cell_list
 import tf_list
 
 MIRROR = Path("/data/projects/encode/data")
@@ -201,10 +203,22 @@ def build(genome):
     for r in chosen:
         encode_copy(r[0], r[1], "bed.gz")
     write(res / "TF-List.All.txt", chosen + [r for r in tf_all if r[1] == "NA"][:1])
-    write(
-        res / "TF-Filtered-Mod.txt", [[*r, "ENCDO000TOY", "toy_tf"] for r in chosen[:2]]
-    )
-    write(res / "Master-Cell-List.txt", [["---"] * 8 + ["toy_tf", "Group1", "yes"]])
+    tf_rows = [[*r, "ENCDO000TOY", "toy_tf"] for r in chosen[:2]]
+    if genome == "mm10":
+        # As in the real config, mm10's step 7 freezes its master list, and the
+        # TF list comes as two column files.
+        tf_files = ["TF-Filtered.txt", "TF-Biosamples.txt"]
+        write(res / tf_files[0], [r[:-1] for r in tf_rows])
+        write(res / tf_files[1], [r[-1:] for r in tf_rows])
+        mark_lists = [res / f"{m}-List.txt" for m in master_cell_list.MARKS]
+        write(
+            res / "Master-Cell-List.txt",
+            master_cell_list.master_rows(mark_lists, res / tf_files[1]),
+        )
+    else:
+        tf_files = ["TF-Filtered-Mod.txt"]
+        write(res / tf_files[0], tf_rows)
+        write(res / "Master-Cell-List.txt", [["---"] * 8 + ["toy_tf", "Group1", "yes"]])
 
     # cDHSs cover only the first half, so that some rDHSs fall in the none class.
     chrom, start, end = window
@@ -239,9 +253,10 @@ def build(genome):
     }
     sources["cCREs-Previous.bed"] = f"{rel}/cCREs.bed.gz"
     sources["TF-List.Cell-Type.txt"] = [
-        f"{rel}/TF-Filtered-Mod.txt",
-        f"{rel}/Master-Cell-List.txt",
+        f"{rel}/{name}" for name in (*tf_files, "Master-Cell-List.txt")
     ]
+    if genome == "mm10":
+        sources["Master-Cell-List.txt"] = f"{rel}/Master-Cell-List.txt"
     return sources
 
 
@@ -295,7 +310,7 @@ def _digest(src, name, scratch):
     if name == "cCREs-Previous.bed":
         freeze_input.previous_ccres(HERE / src, scratch)
     elif name == "TF-List.Cell-Type.txt":
-        freeze_input.cell_type_tf(HERE / src[0], HERE / src[1], scratch)
+        freeze_input.cell_type_tf([HERE / s for s in src[:-1]], HERE / src[-1], scratch)
     else:
         shutil.copy(HERE / src, scratch)
     digest = blake3.blake3(scratch.read_bytes()).hexdigest()

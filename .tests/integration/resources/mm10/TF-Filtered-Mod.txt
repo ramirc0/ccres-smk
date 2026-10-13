@@ -1,2 +1,0 @@
-ENCSR000CBX	ENCFF152DUV	Mus musculus strain C57BL/6J embryonic fibroblast male embryo (13.5 weeks)	POLR2A	0.13108661459839013	Bing Ren, UCSD	primary cell	NA	ENCDO000TOY	toy_tf
-ENCSR000AIU	ENCFF663KMR	Mus musculus myocyte originated from C2C12	POLR2AphosphoS2	0.1648896855975569	Barbara Wold, Caltech	in vitro differentiated cells	NA	ENCDO000TOY	toy_tf

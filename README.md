@@ -58,7 +58,7 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 | 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.txt` | 4_Calculate-Signal-Zscores.sh |
 | 5 | `max_zscore` | `<g>-<mark>-maxZ.txt` | 5_Determine-Max-Zscores.sh |
 | 6 | `classify_ccres` | `<g>-cCREs-Unfiltered.bed` | 6_Classify-cCREs.sh |
-| 7 | `master_cell_list`, `cell_type_ccres`, `cell_type_bigbed` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
+| 7 | `master_cell_list`, `frozen_master_cell_list`, `cell_type_ccres`, `cell_type_bigbed` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
 | 8 | `pls_genes` | `<g>-PLS-Gene-List.txt` | 8_Assign-PLS-Gene.sh |
 
 Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where some position has
@@ -74,9 +74,13 @@ never reach a run unnoticed. Two inputs are derived:
 
 - `cCREs-Previous.bed`: the V1-V3 rows of `Previous-Versions/cCREs.<genome>.bed.gz`. The file now
   also holds V4, the release this port reproduces.
-- `TF-List.Cell-Type.txt`: the rows of `TF-List.Filtered-Mod.txt` whose biosample the release
-  flagged TF=yes in `Master-Cell-List.txt` (121 hg38 biosamples). A 2025 edit of the list matches
-  more biosamples, which would move them to step 7's TF branch.
+- `TF-List.Cell-Type.txt`: the TF experiments of the biosamples the release flagged TF=yes in
+  `Master-Cell-List.txt`. hg38 takes them from `TF-List.Filtered-Mod.txt` (121 biosamples). A 2025
+  edit of that list matches more biosamples, which would move them to step 7's TF branch. mm10
+  takes them from two May 2022 files that hold the list's columns (36 biosamples).
+
+mm10's step 7 freezes the release's May 2022 `Master-Cell-List.txt`. The mm10 mark lists were
+edited in 2025 and no longer rebuild it.
 
 ENCODE files resolve to `<encode_root>/<exp>/<file>.<ext>`, a local mirror. A file missing there
 downloads from ENCODE's public S3 bucket to `data/encode/`. Its key and MD5 come from a snapshot of

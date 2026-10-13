@@ -28,6 +28,7 @@ genomes:
 
 # Frozen input name -> source file(s). freeze_input copies a single source.
 # The two derived inputs filter their sources (see workflow/scripts/freeze_input.py).
+# A Master-Cell-List.txt source replaces the step 7 master list built from the lists.
 sources:
   hg38:
     Hotspot-List.txt: resources/hg38/Hotspot-List.txt
@@ -63,5 +64,7 @@ sources:
     cres.as: resources/mm10/cres.as
     cCREs-Previous.bed: resources/mm10/cCREs.bed.gz
     TF-List.Cell-Type.txt:
-      - resources/mm10/TF-Filtered-Mod.txt
+      - resources/mm10/TF-Filtered.txt
+      - resources/mm10/TF-Biosamples.txt
       - resources/mm10/Master-Cell-List.txt
+    Master-Cell-List.txt: resources/mm10/Master-Cell-List.txt

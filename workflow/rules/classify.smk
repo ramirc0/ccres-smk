@@ -41,6 +41,9 @@ rule classify_ccres:
 
 import master_cell_list as mcl
 
+# Genomes whose step 7 uses a frozen master list instead of building one.
+FROZEN_MASTER = [g for g in GENOMES if "Master-Cell-List.txt" in config["sources"][g]]
+
 
 @cache
 def _master_rows(lists, tf_list):
@@ -64,6 +67,9 @@ def _master_rows(lists, tf_list):
 def master_rows(genome):
     """Return a genome's master cell list rows.
 
+    A genome in `FROZEN_MASTER` reads its frozen list. The others build theirs
+    from the frozen mark and TF lists.
+
     Parameters
     ----------
     genome : str
@@ -74,6 +80,8 @@ def master_rows(genome):
     list of list of str
         Master cell list rows.
     """
+    if genome in FROZEN_MASTER:
+        return read_rows(frozen(genome, "Master-Cell-List.txt"))
     lists = tuple(frozen(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
     return _master_rows(lists, frozen(genome, "TF-List.Cell-Type.txt"))
 
@@ -168,6 +176,8 @@ rule master_cell_list:
         tf_list=lambda w: frozen(w.genome, "TF-List.Cell-Type.txt"),
     output:
         f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
+    wildcard_constraints:
+        genome="|".join(g for g in GENOMES if g not in FROZEN_MASTER),
     log:
         f"{LOGDIR}/master_cell_list/{{genome}}.txt",
     benchmark:
@@ -185,6 +195,27 @@ rule master_cell_list:
             --ctcf {input.ctcf:q} \
             --tf-list {input.tf_list:q} \
             --output {output:q}
+        """
+
+
+rule frozen_master_cell_list:
+    input:
+        lambda w: frozen(w.genome, "Master-Cell-List.txt"),
+    output:
+        f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
+    wildcard_constraints:
+        genome="|".join(FROZEN_MASTER),
+    log:
+        f"{LOGDIR}/frozen_master_cell_list/{{genome}}.txt",
+    benchmark:
+        f"{BENCHDIR}/frozen_master_cell_list/{{genome}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        cp {input:q} {output:q}
         """
 
 

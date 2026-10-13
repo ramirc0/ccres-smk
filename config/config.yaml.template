@@ -28,6 +28,7 @@ genomes:
 
 # Frozen input name -> source file(s). freeze_input copies a single source.
 # The two derived inputs filter their sources (see workflow/scripts/freeze_input.py).
+# A Master-Cell-List.txt source replaces the step 7 master list built from the lists.
 sources:
   hg38:
     Hotspot-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-rDHS/hg38-Hotspot-List.txt
@@ -55,6 +56,13 @@ sources:
     CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/CTCF-List.txt
     ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/ATAC-List.txt
     TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/mm10-TF-List.All.txt
+    # The mm10 mark lists were edited in 2025, so step 7 freezes the May 2022
+    # master list. x and xx (May 31, 2022) are the TF list's columns 1-9 and 10.
+    TF-List.Cell-Type.txt:
+      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/x
+      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/xx
+      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/Cell-Type-Specific/Old/Master-Cell-List.txt
+    Master-Cell-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/Cell-Type-Specific/Old/Master-Cell-List.txt
     cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-cDHS/Altius-cDHSs.DAC-mm10.bed
     rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.mm10.bed.gz
     cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.mm10.bed.gz

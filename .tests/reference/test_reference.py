@@ -12,13 +12,13 @@ LIST_COLUMNS = (4, 5, 6)
 Z_TOLERANCE = 1e-14
 
 
-def read_ours(path):
-    """Open our file as a byte stream, decompressing gzip on the fly.
+def open_bytes(path):
+    """Open a file as a byte stream, decompressing gzip on the fly.
 
     Parameters
     ----------
     path : pathlib.Path
-        Our file. A `.gz` suffix marks gzip or bgzip.
+        File to read. A `.gz` suffix marks gzip or bgzip.
 
     Returns
     -------
@@ -29,19 +29,19 @@ def read_ours(path):
 
 
 def same_bytes(a, b):
-    """Return whether our file holds the bytes of the reference file.
+    """Return whether two files hold the same bytes once decompressed.
 
     Parameters
     ----------
     a, b : pathlib.Path
-        Our file, read through `read_ours`, and the reference file.
+        Files to compare, read through `open_bytes`.
 
     Returns
     -------
     bool
         True if the contents are equal.
     """
-    with read_ours(a) as fa, open(b, "rb") as fb:
+    with open_bytes(a) as fa, open_bytes(b) as fb:
         while (chunk := fa.read(1 << 24)) == fb.read(1 << 24):
             if not chunk:
                 return True
@@ -54,7 +54,7 @@ def first_difference(a, b, normalize_a, normalize_b):
     Parameters
     ----------
     a, b : pathlib.Path
-        Our file, read through `read_ours`, and the reference file.
+        Files to compare, ours first, read through `open_bytes`.
     normalize_a, normalize_b : callable
         Map a line of `a` or `b` to its comparable form.
 
@@ -63,7 +63,7 @@ def first_difference(a, b, normalize_a, normalize_b):
     str or None
         Description of the first difference, None if there is none.
     """
-    with read_ours(a) as fa, open(b, "rb") as fb:
+    with open_bytes(a) as fa, open_bytes(b) as fb:
         n = 0
         for n, (la, lb) in enumerate(zip(fa, fb), start=1):
             if normalize_a(la) != normalize_b(lb):

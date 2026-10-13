@@ -98,7 +98,10 @@ pixi run snakemake --profile profiles/local <target>
   - mm10 `TF-List.Filtered.txt`: column 6 went from `,` to `:` (2023).
   - `TF-List.Filtered-Mod.txt` (Apr 2025) keeps the 2,509 hg38 experiments of May 2022, but flags 279
     biosamples TF=yes instead of 121.
-  - mm10 `Master-Cell-List.txt` and `Individual-Files` were rebuilt in Aug 2025. The 2022 files are in `Old/`.
+  - mm10 `Master-Cell-List.txt` and `Individual-Files` were rebuilt in Aug 2025. Step 7 targets the 2022
+    files in `Old/`: the master list and `.bigBed` (May 31), `.bed.gz` (Nov 2022). The `.bed` files sit in a
+    13 GB tarball. The hidden empty `.bed` and `.bigBed` are orphans. `mm10-TF/x` and `xx` (May 31) are
+    the TF list's columns 1-9 and 10.
   - `Previous-Versions/cCREs.*.bed.gz` gained V4 rows (2025). mm10 mark lists changed in 2025, the mm10
     hotspot list in 2023. `REF/maxZ/` was rebuilt on GENCODE47 (2025).
 - hg38 `REF` has no `tmp.bed`. The script's `rDHS-PreAltius.txt` is `rDHS-PreStam.txt`.

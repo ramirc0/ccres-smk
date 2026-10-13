@@ -78,16 +78,39 @@ STEPS = {
             "Cell-Type-Specific/Master-Cell-List.txt",
             "Cell-Type-Specific/{name}",
             "bytes",
+            {"hg38"},
         ),
         (
             "Cell-Type-Specific/Individual-Files/*.bed.gz",
             "Cell-Type-Specific/Individual-Files/{stem}",
             "bytes",
+            {"hg38"},
         ),
         (
             "Cell-Type-Specific/Individual-Files/*.bigBed",
             "Cell-Type-Specific/Individual-Files/{name}",
             "bytes",
+            {"hg38"},
+        ),
+        # mm10's step 7 was rebuilt in 2025. Old/ keeps the May 2022 files, with
+        # each BED gzipped in November 2022.
+        (
+            "Cell-Type-Specific/Master-Cell-List.txt",
+            "Cell-Type-Specific/Old/{name}",
+            "bytes",
+            {"mm10"},
+        ),
+        (
+            "Cell-Type-Specific/Individual-Files/*.bed.gz",
+            "Cell-Type-Specific/Old/Individual-Files/{name}",
+            "bytes",
+            {"mm10"},
+        ),
+        (
+            "Cell-Type-Specific/Individual-Files/*.bigBed",
+            "Cell-Type-Specific/Old/Individual-Files/{name}",
+            "bytes",
+            {"mm10"},
         ),
     ],
     # The release has no mm10 PLS gene list.
