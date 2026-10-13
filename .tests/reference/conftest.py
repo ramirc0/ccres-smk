@@ -90,6 +90,16 @@ STEPS = {
 }
 
 
+# D5: the release names the neural crest cell's file without its H3K4me3 "NA"
+# and has no file for GM12866, whose only mark is that "NA".
+RENAMED = {
+    "hg38/Cell-Type-Specific/Individual-Files/ENCFF592CNZ_NA_ENCFF346DEM_ENCFF192FOK.bed.gz": (
+        "Cell-Type-Specific/Individual-Files/ENCFF592CNZ_ENCFF346DEM_ENCFF192FOK.bed"
+    ),
+}
+UNMATCHED = {"hg38/Cell-Type-Specific/Individual-Files/NA.bed.gz"}
+
+
 def pytest_addoption(parser):
     """Add the result and reference directory options.
 
@@ -142,12 +152,18 @@ def pytest_generate_tests(metafunc):
                 if genomes and g not in genomes[0]:
                     continue
                 for path in sorted(ours_dir.glob(pattern.format(g=g))):
-                    ref = template.format(g=g, name=path.name, stem=path.stem)
+                    case_id = f"{g}/{path.relative_to(ours_dir)}"
+                    ref = RENAMED.get(
+                        case_id, template.format(g=g, name=path.name, stem=path.stem)
+                    )
+                    marks = [getattr(pytest.mark, step)]
+                    if case_id in UNMATCHED:
+                        marks.append(pytest.mark.skip(reason="D5: no release file"))
                     params.append(
                         pytest.param(
                             (path, reference / f"V7-{g}" / ref, mode),
-                            marks=getattr(pytest.mark, step),
-                            id=f"{g}/{path.relative_to(ours_dir)}",
+                            marks=marks,
+                            id=case_id,
                         )
                     )
     metafunc.parametrize("case", params)

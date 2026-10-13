@@ -42,7 +42,9 @@ pixi run snakemake --profile profiles/local <target>
   and rank columns match. Steps 6-8 do not read ATAC.
 - D5. `REF` hg38 `Individual-Files` mix two master lists. 1,675 files date from May 17-19, 4 from May 26,
   after a `DNase-List.txt` edit. The port follows the final list. `ENCFF346LEZ_ENCFF118OBT_ENCFF536VOI.bed`
-  is stale. `ENCFF269VAY.bigBed` has no `.bed`. The port's two H3K4me3 `NA` biosamples have no `REF` file.
+  is stale. `ENCFF269VAY.bigBed` has no `.bed`. The port names the neural crest cell's file
+  `ENCFF592CNZ_NA_ENCFF346DEM_ENCFF192FOK`, as the published scripts do. It equals `REF`'s
+  `ENCFF592CNZ_ENCFF346DEM_ENCFF192FOK.bed`. GM12866's `NA.bed.gz` is empty. `REF` has no file for it.
 
 ### Release over the published scripts
 
