@@ -5,8 +5,10 @@ A PLS gets the gene of every TSS it overlaps. A PLS overlapping none but
 within a TSS +-2 kb window gets the gene of each closest TSS (all ties) whose
 start lies at most 200 bp from the PLS center. Pairs go through `sort -u`.
 
-The published script tests `abs(diff) < 200`. The release's list was made with
-`<= 200`: its 93 hg38 pairs at exactly 200 bp are kept here.
+Step 6 calls a cCRE TSS-proximal when its center lies within 200 bp, bounds
+included. The published script tests `abs(diff) < 200`, an off-by-one that
+leaves the 93 hg38 PLS at exactly 200 bp without a gene. The release keeps
+them, and so does the port.
 """
 
 import argparse
@@ -62,7 +64,7 @@ def main(argv=None):
     rows = near.nonzero()[0]
     near_iv = tuple(a[rows] for a in pls_iv)
     ia, ib = _bed.closest_pairs(near_iv, tss_iv)
-    # The strand only sets the sign of the distance, and the test is |distance| < 200.
+    # The strand only sets the sign of the distance.
     distance = abs(tss_iv[1][ib] - (near_iv[1][ia] + near_iv[2][ia]) / 2)
     pairs += [
         f"{ccre[rows[i]]}\t{gene[j]}"
