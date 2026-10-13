@@ -64,7 +64,7 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where some position has
 that FDR order, since elsewhere the merged set repeats. It also drops each merged interval once it
 settles. An interval of 50-350 bp is a DHS, and one under 50 bp can only shrink, so neither changes
-the output again. The largest hotspot file (72M positions) takes 35 s.
+the output again. The largest hotspot file (117M positions) takes under 90 s.
 
 ## Inputs
 
