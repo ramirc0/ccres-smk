@@ -34,7 +34,7 @@ pixi run snakemake --profile profiles/local <target>
 
 - D1. filter-tf-rpeaks.py joined a TF cluster's targets, biosamples and experiments in set() order. The
   port sorts them. Affects `TF-Clusters.txt`, `tmp.no-overlap` and `rTFBS-Summary.txt`.
-- D2. Step 7 writes bgzipped, tabix-indexed BED. It writes no bigBed.
+- D2. Step 7 bgzips and tabix-indexes its BED, where the release wrote plain `.bed`. The bigBeds match.
 - D3. Step 1 writes `Processed-DHSs/<signal>.<row>.bed`, not `output.<signal>.<row>`. Step 2 still
   concatenates them in the en_US order of the old names.
 - D4. `REF`'s ATAC files come from a Sep 2023 run on glibc's FMA log, which reproduces them exactly. The

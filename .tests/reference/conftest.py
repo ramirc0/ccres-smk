@@ -84,20 +84,31 @@ STEPS = {
             "Cell-Type-Specific/Individual-Files/{stem}",
             "bytes",
         ),
+        (
+            "Cell-Type-Specific/Individual-Files/*.bigBed",
+            "Cell-Type-Specific/Individual-Files/{name}",
+            "bytes",
+        ),
     ],
     # The release has no mm10 PLS gene list.
     "pls": [("{g}-PLS-Gene-List.txt", "PLS-Gene-List.{g}-V4.txt", "bytes", {"hg38"})],
 }
 
 
-# D5: the release names the neural crest cell's file without its H3K4me3 "NA"
-# and has no file for GM12866, whose only mark is that "NA".
+# D5: the release names the neural crest cell's files without its H3K4me3 "NA"
+# and has none for GM12866, whose only mark is that "NA".
 RENAMED = {
     "hg38/Cell-Type-Specific/Individual-Files/ENCFF592CNZ_NA_ENCFF346DEM_ENCFF192FOK.bed.gz": (
         "Cell-Type-Specific/Individual-Files/ENCFF592CNZ_ENCFF346DEM_ENCFF192FOK.bed"
     ),
+    "hg38/Cell-Type-Specific/Individual-Files/ENCFF592CNZ_NA_ENCFF346DEM_ENCFF192FOK.bigBed": (
+        "Cell-Type-Specific/Individual-Files/ENCFF592CNZ_ENCFF346DEM_ENCFF192FOK.bigBed"
+    ),
 }
-UNMATCHED = {"hg38/Cell-Type-Specific/Individual-Files/NA.bed.gz"}
+UNMATCHED = {
+    "hg38/Cell-Type-Specific/Individual-Files/NA.bed.gz",
+    "hg38/Cell-Type-Specific/Individual-Files/NA.bigBed",
+}
 
 
 def pytest_addoption(parser):

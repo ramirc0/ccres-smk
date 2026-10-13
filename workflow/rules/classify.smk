@@ -89,11 +89,12 @@ def cell_type_files(genome):
     Returns
     -------
     list of str
-        bgzipped BED per biosample.
+        bgzipped BED and bigBed per biosample.
     """
     return [
-        f"{OUTDIR}/{genome}/Cell-Type-Specific/Individual-Files/{mcl.output_name(r)}.bed.gz"
+        f"{OUTDIR}/{genome}/Cell-Type-Specific/Individual-Files/{mcl.output_name(r)}.{ext}"
         for r in master_rows(genome)
+        for ext in ("bed.gz", "bigBed")
     ]
 
 
@@ -216,6 +217,34 @@ rule cell_type_ccres:
             --tss-4k {input.tss_4k:q} \
             {params.flags:q} \
             --output {output.bed:q}
+        """
+
+
+rule cell_type_bigbed:
+    input:
+        bed=f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Individual-Files/{{cts}}.bed.gz",
+        autosql=lambda w: frozen(w.genome, "cres.as"),
+        chrom_sizes=lambda w: frozen(w.genome, "chromInfo.txt"),
+    output:
+        f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Individual-Files/{{cts}}.bigBed",
+    wildcard_constraints:
+        cts=r"[A-Za-z0-9_]+",
+    log:
+        f"{LOGDIR}/cell_type_bigbed/{{genome}}/{{cts}}.txt",
+    benchmark:
+        f"{BENCHDIR}/cell_type_bigbed/{{genome}}/{{cts}}.tsv",
+    software:
+        SOFTWARE_ENV
+    shell:
+        r"""
+        exec &> >(tee {log:q})
+
+        bedToBigBed \
+            -type=bed9+2 \
+            -as={input.autosql:q} \
+            {input.bed:q} \
+            {input.chrom_sizes:q} \
+            {output:q}
         """
 
 

@@ -58,7 +58,7 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 | 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.txt` | 4_Calculate-Signal-Zscores.sh |
 | 5 | `max_zscore` | `<g>-<mark>-maxZ.txt` | 5_Determine-Max-Zscores.sh |
 | 6 | `classify_ccres` | `<g>-cCREs-Unfiltered.bed` | 6_Classify-cCREs.sh |
-| 7 | `master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
+| 7 | `master_cell_list`, `cell_type_ccres`, `cell_type_bigbed` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
 | 8 | `pls_genes` | `<g>-PLS-Gene-List.txt` | 8_Assign-PLS-Gene.sh |
 
 Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where some position has
