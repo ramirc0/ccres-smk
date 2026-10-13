@@ -1,0 +1,3 @@
+ENCSR789AYI	ENCFF209WJY	ENCFF947ZHU	ENCFF963LIF	1	John Stamatoyannopoulos, UW	Mus musculus strain B6NCrl liver tissue
+ENCSR789AYI	ENCFF549BRB	ENCFF982MGZ	ENCFF460BSU	2	John Stamatoyannopoulos, UW	Mus musculus strain B6NCrl liver tissue
+ENCSR611CEJ	ENCFF077MAZ	ENCFF106XAF	ENCFF602HVO	1	John Stamatoyannopoulos, UW	Mus musculus strain B6CASTF1/J frontal cortex tissue female (14 days)

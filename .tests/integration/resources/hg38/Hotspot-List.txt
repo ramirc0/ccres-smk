@@ -1,0 +1,3 @@
+ENCSR670BGI	ENCFF042RIV	ENCFF796XMI	ENCFF577UXC	1	John Stamatoyannopoulos, UW	Homo sapiens middle frontal area 46 tissue female adult (90 or above years)
+ENCSR337IRF	ENCFF401AQE	ENCFF582QOS	ENCFF977SSB	1	John Stamatoyannopoulos, UW	Homo sapiens RCC
+ENCSR337IRF	ENCFF777MJW	ENCFF284OEI	ENCFF759SGT	2	John Stamatoyannopoulos, UW	Homo sapiens RCC

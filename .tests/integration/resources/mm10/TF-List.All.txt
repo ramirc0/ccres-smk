@@ -1,0 +1,7 @@
+ENCSR000CBX	ENCFF152DUV	Mus musculus strain C57BL/6J embryonic fibroblast male embryo (13.5 weeks)	POLR2A	0.13108661459839013	Bing Ren, UCSD	primary cell	NA
+ENCSR000AIU	ENCFF663KMR	Mus musculus myocyte originated from C2C12	POLR2AphosphoS2	0.1648896855975569	Barbara Wold, Caltech	in vitro differentiated cells	NA
+ENCSR000AIX	ENCFF049RYJ	Mus musculus myocyte originated from C2C12	POLR2A	0.2810882002416246	Barbara Wold, Caltech	in vitro differentiated cells	NA
+ENCSR104QEN	ENCFF907XEG	Mus musculus strain B6NCrl stomach tissue postnatal (0 days)	CTCF	0.355442269508241	Richard Myers, HAIB	tissue	NA
+ENCSR002ZAG	ENCFF074DVX	Mus musculus strain B6NCrl intestine tissue postnatal (0 days)	CTCF	0.396976222348376	Richard Myers, HAIB	tissue	NA
+ENCSR418SBY	ENCFF198SSR	Mus musculus strain B6NCrl lung tissue postnatal (0 days)	CTCF	0.2610132369131059	Richard Myers, HAIB	tissue	NA
+ENCSR000DHE	NA	Mus musculus megakaryocyte embryo (14.5 days)	TAL1	NA	Ross Hardison, PennState	primary cell	NA

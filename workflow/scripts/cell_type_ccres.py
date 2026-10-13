@@ -321,7 +321,7 @@ def main(argv=None):
         bed = master_rows(master, names(dnase_high))
     else:
         bed = master
-    bed_table = pl.DataFrame(bed, schema=MASTER, orient="row")
+    bed_table = pl.DataFrame(bed, schema=dict.fromkeys(MASTER, pl.String), orient="row")
     codes = _bed.shared_codes(bed_table["chrom"], tss["chrom"], window["chrom"])
     region_iv, tss_iv, window_iv = (
         (c, t["start"].cast(pl.Int64).to_numpy(), t["end"].cast(pl.Int64).to_numpy())
@@ -378,7 +378,9 @@ def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
     ca = master_rows(master, classes["CA-only"])
     if args.tf_list:
         summits = tf_summits(args)
-        ca_table = pl.DataFrame(ca, schema=MASTER, orient="row")
+        ca_table = pl.DataFrame(
+            ca, schema=dict.fromkeys(MASTER, pl.String), orient="row"
+        )
         ca_codes, summit_codes = _bed.shared_codes(ca_table["chrom"], summits["chrom"])
         hit = _bed.overlaps_any(
             (

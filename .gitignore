@@ -229,3 +229,6 @@ scratch
 config/config.yaml
 # symlink to the data volume
 /data
+
+# integration test outputs
+.tests/integration/data
