@@ -100,12 +100,12 @@ def cut_bed(source, target, window, compress):
         Gzip the output.
     """
     opener = gzip.open if source.suffix == ".gz" else open
+    with opener(source, "rt") as f:
+        text = "".join(line for line in f if in_window(line.split("\t"), window))
     target.parent.mkdir(parents=True, exist_ok=True)
-    with (
-        opener(source, "rt") as f,
-        (gzip.open if compress else open)(target, "wt") as o,
-    ):
-        o.writelines(line for line in f if in_window(line.split("\t"), window))
+    # mtime=0 keeps the gzip bytes the same from run to run.
+    data = text.encode()
+    target.write_bytes(gzip.compress(data, mtime=0) if compress else data)
 
 
 def cut_bigwig(source, target, window, sizes):
