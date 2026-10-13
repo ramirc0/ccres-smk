@@ -98,7 +98,7 @@ pixi run snakemake --profile profiles/local <target>
   - mm10 `Master-Cell-List.txt` and `Individual-Files` were rebuilt in Aug 2025. The 2022 files are in `Old/`.
   - `Previous-Versions/cCREs.*.bed.gz` gained V4 rows (2025). mm10 mark lists changed in 2025, the mm10
     hotspot list in 2023. `REF/maxZ/` was rebuilt on GENCODE47 (2025).
-- hg38 `REF` has no `tmp.bed` or `tmp.no-overlap`. The script's `rDHS-PreAltius.txt` is `rDHS-PreStam.txt`.
+- hg38 `REF` has no `tmp.bed`. The script's `rDHS-PreAltius.txt` is `rDHS-PreStam.txt`.
 
 ## Gotchas
 
