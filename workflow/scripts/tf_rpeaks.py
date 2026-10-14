@@ -1,9 +1,8 @@
 """Step 3b: reduce the TF peaks to representative peaks (rPeaks).
 
-Port of 3_Curate-TF-Clusters.sh: peaks on chromosomes without '_' and on lines
-without chrEBV or chrM are sorted with `sort -k1,1 -k2,2n`, then reduced by
-the merge, pick and intersect loop on signalValue (column 7) and name
-(column 14).
+Port of 3_Curate-TF-Clusters.sh: peaks on chromosomes without '_' other than
+chrEBV and chrM are sorted with `sort -k1,1 -k2,2n`, then reduced by the merge,
+pick and intersect loop on signalValue (column 7) and name (column 14).
 """
 
 import argparse
@@ -39,12 +38,7 @@ def main(argv=None):
     """
     args = build_parser().parse_args(argv)
     peaks = _bed.read_tsv(args.bed, COLUMNS)
-    line = pl.concat_str(COLUMNS, separator="\t")
-    peaks = peaks.filter(
-        ~pl.col("c1").str.contains("_", literal=True)
-        & ~line.str.contains("chrEBV", literal=True)
-        & ~line.str.contains("chrM", literal=True)
-    )
+    peaks = peaks.filter(_bed.primary(pl.col("c1")))
     peaks = peaks[_bed.gnu_sort(peaks, text_keys=["c1"], numeric_keys=["c2"])]
     picks = _registry.representative_peaks(
         _bed.chrom_codes(peaks["c1"]),

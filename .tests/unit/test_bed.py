@@ -347,3 +347,15 @@ def test_closest_pairs(bedtools, tmp_path, seed):
         for line in bedtools("closest", "-d", "-a", pa, "-b", pb).splitlines()
     ]
     assert ours == expected
+
+
+def test_primary_chromosomes_judge_the_chromosome_alone():
+    """Drop chrM, chrEBV and names with '_', whatever the other fields hold."""
+    rows = pl.DataFrame(
+        {
+            "chrom": ["chr1", "chrM", "chrEBV", "chr1_KI270706v1_random", "chr2"],
+            "name": ["peak", "peak", "peak", "peak", "chrM_peak"],
+        }
+    )
+    kept = rows.filter(_bed.primary(pl.col("chrom")))
+    assert kept["chrom"].to_list() == ["chr1", "chr2"]

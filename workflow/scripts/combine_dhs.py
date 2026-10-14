@@ -2,9 +2,8 @@
 
 Port of the first part of 2_Create-rDHSs.sh. `cat output.*` concatenated the
 step 1 files in en_US glob order of their original names, output.<signal>.<row>.
-The filter keeps DHSs on chromosomes without '_', at least 150 bp wide, with
-signal at least the cutoff and FDR at most 0.001, then drops every line that
-contains chrEBV or chrM.
+The filter keeps DHSs at least 150 bp wide, with signal at least the cutoff
+and FDR at most 0.001, on chromosomes without '_' other than chrEBV and chrM.
 """
 
 import argparse
@@ -79,14 +78,11 @@ def main(argv=None):
         fdr_value=_bed.python_floats(dhs["fdr"]),
     )
     width = pl.col("end").cast(pl.Int64) - pl.col("start").cast(pl.Int64)
-    line = pl.concat_str(COLUMNS, separator="\t")
     keep = (
-        ~pl.col("chrom").str.contains("_", literal=True)
+        _bed.primary(pl.col("chrom"))
         & (width >= MIN_WIDTH)
         & (pl.col("signal_value") >= args.cutoff)
         & (pl.col("fdr_value") <= MAX_FDR)
-        & ~line.str.contains("chrEBV", literal=True)
-        & ~line.str.contains("chrM", literal=True)
     )
     _bed.write_tsv(dhs.filter(keep).select(COLUMNS), args.filtered)
 

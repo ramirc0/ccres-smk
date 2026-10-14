@@ -288,6 +288,25 @@ def sort_unique(line_list):
     return out
 
 
+def primary(chrom):
+    """Tell which chromosomes steps 2 and 3 keep.
+
+    The scripts dropped every line that contained chrEBV or chrM. Here only
+    the chromosome counts.
+
+    Parameters
+    ----------
+    chrom : polars.Expr
+        Chromosome names.
+
+    Returns
+    -------
+    polars.Expr
+        False for chrEBV, chrM and names with '_'.
+    """
+    return ~chrom.str.contains("_", literal=True) & ~chrom.is_in(["chrEBV", "chrM"])
+
+
 def chrom_codes(chroms):
     """Code chromosomes by order of first appearance.
 
