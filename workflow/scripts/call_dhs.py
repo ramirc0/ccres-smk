@@ -45,7 +45,12 @@ def build_parser():
 
 
 def fdr_order(text):
-    """Return the order filter-long-double.py reads from an FDR.
+    """Return the order of an FDR, the k with 10**-k <= FDR < 10**-(k - 1).
+
+    An FDR passes threshold 1E-j when its order exceeds j. filter-long-double.py
+    printed an FDR without an exponent as '%.2E' before reading its order, which
+    rounds 0.000999745 into order 3, and an FDR of 1 into one that passes every
+    threshold.
 
     Parameters
     ----------
@@ -55,14 +60,10 @@ def fdr_order(text):
     Returns
     -------
     int
-        Exponent after the first '-' of the text, printed as '%.2E' first if it
-        has no exponent. `KEEP` if the printed text has a '+'.
+        The order, read exactly from the decimal text. `KEEP` for 0.
     """
-    if "e" not in text and "E" not in text:
-        text = "%.2E" % Decimal(text)  # noqa: UP031 (the original's formatting)
-    if "+" in text:
-        return KEEP
-    return int(text.split("-")[1])
+    value = Decimal(text)
+    return KEEP if value == 0 else -value.adjusted()
 
 
 def per_value(series, function, dtype):

@@ -7,8 +7,10 @@ import numpy as np
 import pytest
 
 MIN_P = 10
-# Fixed-notation FDRs as Hotspot2 prints them. 0.0099999 rounds to order 2.
-FIXED = ["0.0468394", "0.0099999", "0.00999", "0.000277824", "0"]
+# Fixed-notation FDRs as Hotspot2 prints them. The original reads their order
+# from '%.2E', so values it rounds into the next order, such as 0.0099999, would
+# make it differ from the port.
+FIXED = ["0.0468394", "0.00999", "0.000277824", "0"]
 
 
 def track(rng, regions):
@@ -127,6 +129,24 @@ def short(text):
     return "".join(
         line for line in text.splitlines(keepends=True) if length(line) <= 350
     )
+
+
+@pytest.mark.parametrize(
+    ("text", "order"),
+    [
+        ("1.23e-05", 5),
+        ("1e-4942", 4942),
+        ("0.0468394", 2),
+        ("0.00999", 3),
+        ("0.0099999", 3),
+        ("0.000999745", 4),
+        ("1", 0),
+        ("0", call_dhs.KEEP),
+    ],
+)
+def test_fdr_order_is_exact(text, order):
+    """Read the order k with 10^-k <= FDR < 10^-(k - 1) from the text."""
+    assert call_dhs.fdr_order(text) == order
 
 
 @pytest.mark.parametrize("seed", range(4))
