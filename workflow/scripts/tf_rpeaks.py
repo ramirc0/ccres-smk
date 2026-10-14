@@ -25,7 +25,7 @@ def build_parser():
     """
     p = argparse.ArgumentParser(description="Pick representative TF peaks.")
     p.add_argument("--bed", required=True, help="tmp.bed of tf_peaks.py.")
-    p.add_argument("-o", "--output", required=True, help="tmp.rPeaks to write.")
+    p.add_argument("-o", "--output", required=True, help="tmp-rPeaks to write.")
     return p
 
 

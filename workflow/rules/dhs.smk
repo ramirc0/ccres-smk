@@ -16,7 +16,7 @@ def processed_dhs(genome):
     """
     rows = read_rows(frozen_list(genome, "Hotspot-List.txt"))
     return [
-        f"{OUTDIR}/{genome}/rDHS/Processed-DHSs/{r[2]}.{i}.bed"
+        f"{OUTDIR}/{genome}/rDHS/Processed-DHSs/{r[2]}-{i}.bed"
         for i, r in enumerate(rows, start=1)
     ]
 
@@ -27,8 +27,8 @@ rule call_dhs:
             encode_file(hotspot_experiment(w.genome, w.acc), w.acc, "bed.gz")
         ),
     output:
-        dhs=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}.DHSs.bed",
-        excluded=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}.Excluded.bed",
+        dhs=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-DHSs.bed",
+        excluded=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-Excluded.bed",
     params:
         min_p=lambda w: config["genomes"][w.genome]["min_p"],
     log:
@@ -52,21 +52,21 @@ rule call_dhs:
 
 
 # {acc} is the signal file of hotspot list row {row}. The original named its
-# outputs output.<acc>.<row>, and step 2 concatenates them in that name order.
+# outputs output.<acc>.<row>, and step 2 still concatenates them in that order.
 rule process_dhs:
     input:
-        dhs=lambda w: f"{OUTDIR}/{w.genome}/rDHS/DHSs/{hotspot_row(w.genome, w.row)[1]}.DHSs.bed",
+        dhs=lambda w: f"{OUTDIR}/{w.genome}/rDHS/DHSs/{hotspot_row(w.genome, w.row)[1]}-DHSs.bed",
         bigwig=lambda w: ancient(
             encode_file(hotspot_row(w.genome, w.row)[0], w.acc, "bigWig")
         ),
     output:
-        f"{OUTDIR}/{{genome}}/rDHS/Processed-DHSs/{{acc}}.{{row}}.bed",
+        f"{OUTDIR}/{{genome}}/rDHS/Processed-DHSs/{{acc}}-{{row}}.bed",
     params:
         peak=lambda w: hotspot_row(w.genome, w.row)[1],
     log:
-        f"{LOGDIR}/process_dhs/{{genome}}/{{acc}}.{{row}}.txt",
+        f"{LOGDIR}/process_dhs/{{genome}}/{{acc}}-{{row}}.txt",
     benchmark:
-        f"{BENCHDIR}/process_dhs/{{genome}}/{{acc}}.{{row}}.tsv",
+        f"{BENCHDIR}/process_dhs/{{genome}}/{{acc}}-{{row}}.tsv",
     software:
         SOFTWARE_ENV
     shell:

@@ -20,7 +20,7 @@ def build_parser():
         Parser for the tf_list.py flags.
     """
     p = argparse.ArgumentParser(description="Filter the TF experiment list.")
-    p.add_argument("-i", "--input", required=True, help="TF-List.All.txt.")
+    p.add_argument("-i", "--input", required=True, help="TF-List-All.txt.")
     p.add_argument("-o", "--output", required=True, help="Filtered list to write.")
     p.add_argument("--min-frip", type=float, default=MIN_FRIP, help="FRiP threshold.")
     return p
@@ -32,7 +32,7 @@ def passes(fields, min_frip=MIN_FRIP):
     Parameters
     ----------
     fields : list of str
-        Fields of one TF-List.All.txt line.
+        Fields of one TF-List-All.txt line.
     min_frip : float
         FRiP threshold.
 

@@ -8,7 +8,7 @@ DERIVED = {
 # Lists whose experiments Biosample-Keys.txt keys from the metadata snapshot.
 KEYED_LISTS = [
     *(f"{mark}-List.txt" for mark in ("DNase", "H3K4me3", "H3K27ac", "CTCF")),
-    "TF-List.All.txt",
+    "TF-List-All.txt",
 ]
 
 

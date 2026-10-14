@@ -57,7 +57,7 @@ rule extend_anchors:
     input:
         f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.bed",
     output:
-        f"{OUTDIR}/{{genome}}/signal-output/Anchors.{{width}}bp.bed",
+        f"{OUTDIR}/{{genome}}/signal-output/Anchors-{{width}}bp.bed",
     wildcard_constraints:
         width=r"\d+",
     log:
@@ -81,7 +81,7 @@ rule extend_anchors:
 
 rule signal_zscore:
     input:
-        anchors=lambda w: f"{OUTDIR}/{w.genome}/signal-output/Anchors.{WIDTH[w.mark]}bp.bed",
+        anchors=lambda w: f"{OUTDIR}/{w.genome}/signal-output/Anchors-{WIDTH[w.mark]}bp.bed",
         bigwig=lambda w: ancient(encode_file(w.exp, w.signal, "bigWig")),
     output:
         f"{OUTDIR}/{{genome}}/signal-output/{{mark}}/{{exp}}-{{signal}}.txt",

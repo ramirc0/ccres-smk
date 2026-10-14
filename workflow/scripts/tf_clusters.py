@@ -30,12 +30,12 @@ def build_parser():
         Parser for the tf_clusters.py flags.
     """
     p = argparse.ArgumentParser(description="Curate TF clusters.")
-    p.add_argument("--rpeaks", required=True, help="tmp.rPeaks.")
-    p.add_argument("--summits", required=True, help="tmp.summits.")
+    p.add_argument("--rpeaks", required=True, help="tmp-rPeaks.")
+    p.add_argument("--summits", required=True, help="tmp-summits.")
     p.add_argument("--rdhs", required=True, help="rDHS BED of the genome.")
     p.add_argument("--genome", required=True, help="hg38 or mm10.")
     p.add_argument("--clusters", required=True, help="TF-Clusters.txt to write.")
-    p.add_argument("--no-overlap", required=True, help="tmp.no-overlap to write.")
+    p.add_argument("--no-overlap", required=True, help="tmp-no-overlap to write.")
     p.add_argument("--summary", required=True, help="rTFBS-Summary.txt to write.")
     p.add_argument("--rtfbs", required=True, help="rTFBS.bed to write.")
     return p

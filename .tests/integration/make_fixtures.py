@@ -178,9 +178,13 @@ def build(genome):
         encode_copy(r[0], r[2], "bigWig")
     write(res / "Hotspot-List.txt", hotspots)
 
+    # A mark list holds one file per experiment, as in the real lists.
+    first = {}
+    for r in hotspots:
+        first.setdefault(r[0], r)
     marks = {}
     marks["DNase"] = [
-        [r[0], r[2], name] for r, name in zip(hotspots, ("toy_tf", "toy_dnase"))
+        [r[0], r[2], name] for r, name in zip(first.values(), ("toy_tf", "toy_dnase"))
     ]
     for mark, names in (
         ("H3K4me3", ("toy_tf",)),
@@ -197,7 +201,7 @@ def build(genome):
                 encode_copy(exp, acc, "bigWig")
         write(res / f"{mark}-List.txt", table)
 
-    tf_all = rows(frozen / "TF-List.All.txt")
+    tf_all = rows(frozen / "TF-List-All.txt")
     passing = [r for r in tf_all if tf_list.passes(r)]
     counts = []
     for r in passing[:200]:
@@ -206,7 +210,7 @@ def build(genome):
     chosen = [r for _, r in sorted(counts, key=lambda c: -c[0])[:TF_EXPERIMENTS]]
     for r in chosen:
         encode_copy(r[0], r[1], "bed.gz")
-    write(res / "TF-List.All.txt", chosen + [r for r in tf_all if r[1] == "NA"][:1])
+    write(res / "TF-List-All.txt", chosen + [r for r in tf_all if r[1] == "NA"][:1])
     named = [row for table in marks.values() for row in table]
     named += [
         (r[0], r[1], "toy_tf" if r in chosen[:2] else "toy_tf_other") for r in chosen
@@ -220,7 +224,7 @@ def build(genome):
         (chrom, start, (start + end) // 2),
         False,
     )
-    for name in ("TSS.Basic.bed", "TSS.Basic.4K.bed"):
+    for name in ("TSS-Basic.bed", "TSS-Basic-4K.bed"):
         cut_bed(frozen / name, res / name, window, compress=False)
     cut_bed(
         PREVIOUS / f"rDHS.{genome}.bed.gz", res / "rDHS-Previous.bed.gz", window, True
@@ -234,11 +238,11 @@ def build(genome):
         for name in (
             "Hotspot-List.txt",
             *(f"{m}-List.txt" for m in marks),
-            "TF-List.All.txt",
+            "TF-List-All.txt",
             "cDHSs.bed",
             "rDHS-Previous.bed.gz",
-            "TSS.Basic.bed",
-            "TSS.Basic.4K.bed",
+            "TSS-Basic.bed",
+            "TSS-Basic-4K.bed",
             "chromInfo.txt",
             "cres.as",
         )
@@ -364,7 +368,7 @@ def main():
     for genome, names in sources.items():
         lists = ["DNase", "H3K4me3", "H3K27ac", "CTCF", "TF"]
         keyed = [
-            names[f"{m}-List.All.txt" if m == "TF" else f"{m}-List.txt"] for m in lists
+            names[f"{m}-List-All.txt" if m == "TF" else f"{m}-List.txt"] for m in lists
         ]
         derived = {"Biosample-Keys.txt": [*keyed, "resources/metadata"]}
         for name, src in {**names, **derived}.items():

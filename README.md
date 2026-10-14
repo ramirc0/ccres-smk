@@ -51,15 +51,15 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 
 | Step | Rule | Output under `data/results/<run_id>/<genome>/` | Original |
 |---|---|---|---|
-| 0 | `call_dhs` | `rDHS/DHSs/<peak>.{DHSs,Excluded}.bed` | 0_Call-DHSs.sh |
-| 1 | `process_dhs` | `rDHS/Processed-DHSs/<signal>.<row>.bed` | 1_Process-DHSs.sh |
+| 0 | `call_dhs` | `rDHS/DHSs/<peak>-{DHSs,Excluded}.bed` | 0_Call-DHSs.sh |
+| 1 | `process_dhs` | `rDHS/Processed-DHSs/<signal>-<row>.bed` | 1_Process-DHSs.sh |
 | 2 | `combine_dhs`, `create_rdhs`, `derive_constants` | `rDHS/<g>-DHS-{All,Filtered}.bed`, `rDHS/<g>-rDHS-*`, `rDHS/<g>-Constants.tsv` | 2_Create-rDHSs.sh |
 | 3 | `tf_list`, `tf_peaks`, `tf_rpeaks`, `tf_clusters` | `TF/` | 3_Curate-TF-Clusters.sh |
 | - | `anchors` | `<g>-Anchors.bed` | none (rDHSs + rTFBSs, sorted) |
 | 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.txt` | 4_Calculate-Signal-Zscores.sh |
 | 5 | `max_zscore` | `<g>-<mark>-maxZ.txt` | 5_Determine-Max-Zscores.sh |
 | 6 | `classify_ccres` | `<g>-cCREs-Unfiltered.bed` | 6_Classify-cCREs.sh |
-| 7 | `master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
+| 7 | `master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/Individual-Files/<exp>.{bed.gz,bigBed}` | 7_Call-Cell-Type-Specific.sh |
 | 8 | `pls_genes` | `<g>-PLS-Gene-List.txt` | 8_Assign-PLS-Gene.sh |
 
 Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where some position has
@@ -72,6 +72,10 @@ for hg38, 0.203923 for mm10). The run keeps the release values. `derive_constant
 data give next to them: the largest FDR order in the hotspot files and the 10th percentile of the
 DHS-All signal.
 
+Step 7 names each biosample's files after its first experiment, in the order DNase, H3K4me3,
+H3K27ac, CTCF. The release joined the file accessions. Names the port invents use letters, digits
+and `-`.
+
 Steps 4-5 score ATAC like the other assays, but steps 6-8 never read its z-scores. ATAC sets no
 class, though the paper's Fig. 1 lists it among the classifying signals.
 
@@ -83,7 +87,7 @@ never reach a run unnoticed. Two inputs are derived:
 
 - `cCREs-Previous.bed`: the V1-V3 rows of `Previous-Versions/cCREs.<genome>.bed.gz`. The file now
   also holds V4, the release this port reproduces.
-- `Biosample-Keys.txt`: a key for each experiment file of the mark lists and `TF-List.All.txt`,
+- `Biosample-Keys.txt`: a key for each experiment file of the mark lists and `TF-List-All.txt`,
   from the ENCODE metadata snapshot. It is the sorted set of the biosamples whose replicates made the
   file. A biosample is its ontology term, donor (a mouse's strain background), treatments, age, life
   stage, sex, differentiation time, genetic modifications, cell-cycle phase, diseases and origin.

@@ -33,12 +33,12 @@ sources:
     H3K27ac-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/H3K27ac-List.txt
     CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/CTCF-List.txt
     ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/ATAC-List.txt
-    TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-TF/hg38-TF-List.All.txt
+    TF-List-All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-TF/hg38-TF-List.All.txt
     cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-cDHS/Altius-cDHSs.DAC-hg38.bed
     rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.hg38.bed.gz
     cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.hg38.bed.gz
-    TSS.Basic.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/GENCODE40/TSS.Basic.bed
-    TSS.Basic.4K.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/GENCODE40/TSS.Basic.4K.bed
+    TSS-Basic.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/GENCODE40/TSS.Basic.bed
+    TSS-Basic-4K.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/GENCODE40/TSS.Basic.4K.bed
     chromInfo.txt: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Human/hg38/chromInfo.txt
     cres.as: /data/zusers/moorej3/moorej.ghpcc.project/Reference/cres.as
   mm10:
@@ -48,11 +48,11 @@ sources:
     H3K27ac-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/H3K27ac-List.txt
     CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/CTCF-List.txt
     ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/ATAC-List.txt
-    TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/mm10-TF-List.All.txt
+    TF-List-All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/mm10-TF-List.All.txt
     cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-cDHS/Altius-cDHSs.DAC-mm10.bed
     rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.mm10.bed.gz
     cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.mm10.bed.gz
-    TSS.Basic.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/GENCODEM25/TSS.Basic.bed
-    TSS.Basic.4K.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/GENCODEM25/TSS.Basic.4K.bed
+    TSS-Basic.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/GENCODEM25/TSS.Basic.bed
+    TSS-Basic-4K.bed: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/GENCODEM25/TSS.Basic.4K.bed
     chromInfo.txt: /data/zusers/moorej3/moorej.ghpcc.project/Reference/Mouse/ChromInfo.txt
     cres.as: /data/zusers/moorej3/moorej.ghpcc.project/Reference/cres.as

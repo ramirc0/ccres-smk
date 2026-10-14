@@ -170,4 +170,13 @@ def test_na_file_counts_as_missing(tmp_path):
             "k",
         ]
     ]
-    assert mcl.output_name(rows[0]) == "ENCFF000AAA_ENCFF000AAD_ENCFF000AAE"
+
+
+def test_output_name_is_the_first_experiment():
+    """Name a row's files after its first experiment: DNase, then the marks."""
+    missing = ["---", "---"]
+    with_dnase = ["ENCSR000AAA", "ENCFF000AAA", *missing, "ENCSR000AAB", "ENCFF000AAB"]
+    without = [*missing * 2, "ENCSR000AAC", "ENCFF000AAC", "ENCSR000AAD", "ENCFF000AAD"]
+    tail = ["cell", "Group5", "no", "key"]
+    assert mcl.output_name([*with_dnase, *missing, *tail]) == "ENCSR000AAA"
+    assert mcl.output_name([*without, *tail]) == "ENCSR000AAC"

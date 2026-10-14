@@ -31,7 +31,7 @@ def build_parser():
     p = argparse.ArgumentParser(description="Concatenate and filter DHSs.")
     p.add_argument("--hotspots", required=True, help="Hotspot list of the genome.")
     p.add_argument(
-        "--processed", required=True, help="Directory of <signal>.<row>.bed files."
+        "--processed", required=True, help="Directory of <signal>-<row>.bed files."
     )
     p.add_argument("--cutoff", type=float, required=True, help="Minimum signal.")
     p.add_argument("--all", required=True, help="Concatenated DHS BED to write.")
@@ -50,13 +50,13 @@ def glob_order(hotspots):
     Returns
     -------
     list of str
-        `<signal>.<row>` stems, ordered as en_US orders `output.<signal>.<row>`.
+        `<signal>-<row>` stems, ordered as en_US orders the original names,
+        `output.<signal>.<row>`.
     """
     with open(hotspots) as f:
-        stems = [
-            f"{line.split(chr(9))[2]}.{row}" for row, line in enumerate(f, start=1)
-        ]
-    return sorted(stems, key=lambda s: locale.strxfrm(f"output.{s}"))
+        pairs = [(line.split("\t")[2], row) for row, line in enumerate(f, start=1)]
+    pairs.sort(key=lambda p: locale.strxfrm(f"output.{p[0]}.{p[1]}"))
+    return [f"{signal}-{row}" for signal, row in pairs]
 
 
 def main(argv=None):

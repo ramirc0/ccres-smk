@@ -33,11 +33,11 @@ sources:
     H3K27ac-List.txt: resources/hg38/H3K27ac-List.txt
     CTCF-List.txt: resources/hg38/CTCF-List.txt
     ATAC-List.txt: resources/hg38/ATAC-List.txt
-    TF-List.All.txt: resources/hg38/TF-List.All.txt
+    TF-List-All.txt: resources/hg38/TF-List-All.txt
     cDHSs.bed: resources/hg38/cDHSs.bed
     rDHS-Previous.bed.gz: resources/hg38/rDHS-Previous.bed.gz
-    TSS.Basic.bed: resources/hg38/TSS.Basic.bed
-    TSS.Basic.4K.bed: resources/hg38/TSS.Basic.4K.bed
+    TSS-Basic.bed: resources/hg38/TSS-Basic.bed
+    TSS-Basic-4K.bed: resources/hg38/TSS-Basic-4K.bed
     chromInfo.txt: resources/hg38/chromInfo.txt
     cres.as: resources/hg38/cres.as
     cCREs-Previous.bed: resources/hg38/cCREs.bed.gz
@@ -48,11 +48,11 @@ sources:
     H3K27ac-List.txt: resources/mm10/H3K27ac-List.txt
     CTCF-List.txt: resources/mm10/CTCF-List.txt
     ATAC-List.txt: resources/mm10/ATAC-List.txt
-    TF-List.All.txt: resources/mm10/TF-List.All.txt
+    TF-List-All.txt: resources/mm10/TF-List-All.txt
     cDHSs.bed: resources/mm10/cDHSs.bed
     rDHS-Previous.bed.gz: resources/mm10/rDHS-Previous.bed.gz
-    TSS.Basic.bed: resources/mm10/TSS.Basic.bed
-    TSS.Basic.4K.bed: resources/mm10/TSS.Basic.4K.bed
+    TSS-Basic.bed: resources/mm10/TSS-Basic.bed
+    TSS-Basic-4K.bed: resources/mm10/TSS-Basic-4K.bed
     chromInfo.txt: resources/mm10/chromInfo.txt
     cres.as: resources/mm10/cres.as
     cCREs-Previous.bed: resources/mm10/cCREs.bed.gz

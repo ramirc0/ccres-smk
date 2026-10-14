@@ -5,9 +5,9 @@ import tf_list as tfl
 
 rule tf_list:
     input:
-        lambda w: frozen(w.genome, "TF-List.All.txt"),
+        lambda w: frozen(w.genome, "TF-List-All.txt"),
     output:
-        f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-List.Filtered.txt",
+        f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-List-Filtered.txt",
     log:
         f"{LOGDIR}/tf_list/{{genome}}.txt",
     benchmark:
@@ -40,20 +40,20 @@ def tf_rows(genome):
     Returns
     -------
     list of list of str
-        TF-List.All.txt rows that pass.
+        TF-List-All.txt rows that pass.
     """
-    return [r for r in read_rows(frozen_list(genome, "TF-List.All.txt")) if tfl.passes(r)]
+    return [r for r in read_rows(frozen_list(genome, "TF-List-All.txt")) if tfl.passes(r)]
 
 
 rule tf_peaks:
     input:
-        tf_list=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-List.Filtered.txt",
+        tf_list=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-List-Filtered.txt",
         peaks=lambda w: [
             ancient(encode_file(r[0], r[1], "bed.gz")) for r in tf_rows(w.genome)
         ],
     output:
         bed=f"{OUTDIR}/{{genome}}/TF/tmp.bed",
-        summits=f"{OUTDIR}/{{genome}}/TF/tmp.summits",
+        summits=f"{OUTDIR}/{{genome}}/TF/tmp-summits",
     params:
         encode_root=ENCODE_ROOT,
         download_dir=DOWNLOAD_DIR,
@@ -82,7 +82,7 @@ rule tf_rpeaks:
     input:
         f"{OUTDIR}/{{genome}}/TF/tmp.bed",
     output:
-        f"{OUTDIR}/{{genome}}/TF/tmp.rPeaks",
+        f"{OUTDIR}/{{genome}}/TF/tmp-rPeaks",
     log:
         f"{LOGDIR}/tf_rpeaks/{{genome}}.txt",
     benchmark:
@@ -103,12 +103,12 @@ rule tf_rpeaks:
 
 rule tf_clusters:
     input:
-        rpeaks=f"{OUTDIR}/{{genome}}/TF/tmp.rPeaks",
-        summits=f"{OUTDIR}/{{genome}}/TF/tmp.summits",
+        rpeaks=f"{OUTDIR}/{{genome}}/TF/tmp-rPeaks",
+        summits=f"{OUTDIR}/{{genome}}/TF/tmp-summits",
         rdhs=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered.bed",
     output:
         clusters=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-Clusters.txt",
-        no_overlap=f"{OUTDIR}/{{genome}}/TF/tmp.no-overlap",
+        no_overlap=f"{OUTDIR}/{{genome}}/TF/tmp-no-overlap",
         summary=f"{OUTDIR}/{{genome}}/TF/{{genome}}-rTFBS-Summary.txt",
         rtfbs=f"{OUTDIR}/{{genome}}/TF/{{genome}}-rTFBS.bed",
     log:

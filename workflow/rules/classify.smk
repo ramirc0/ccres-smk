@@ -8,8 +8,8 @@ rule classify_ccres:
         h3k4me3=f"{OUTDIR}/{{genome}}/{{genome}}-H3K4me3-maxZ.txt",
         h3k27ac=f"{OUTDIR}/{{genome}}/{{genome}}-H3K27ac-maxZ.txt",
         ctcf=f"{OUTDIR}/{{genome}}/{{genome}}-CTCF-maxZ.txt",
-        tss=lambda w: frozen(w.genome, "TSS.Basic.bed"),
-        tss_4k=lambda w: frozen(w.genome, "TSS.Basic.4K.bed"),
+        tss=lambda w: frozen(w.genome, "TSS-Basic.bed"),
+        tss_4k=lambda w: frozen(w.genome, "TSS-Basic-4K.bed"),
         tf_clusters=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-Clusters.txt",
         previous=lambda w: frozen(w.genome, "cCREs-Previous.bed"),
     output:
@@ -53,7 +53,7 @@ def _master_rows(lists, tf_list, keys):
     lists : tuple of str
         DNase, H3K4me3, H3K27ac and CTCF lists.
     tf_list : str
-        TF-List.All.txt.
+        TF-List-All.txt.
     keys : str
         Biosample-Keys.txt.
 
@@ -81,7 +81,7 @@ def master_rows(genome):
     lists = tuple(frozen_list(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
     return _master_rows(
         lists,
-        frozen_list(genome, "TF-List.All.txt"),
+        frozen_list(genome, "TF-List-All.txt"),
         frozen_list(genome, "Biosample-Keys.txt"),
     )
 
@@ -101,7 +101,7 @@ def tf_experiments(genome):
         (experiment, peak file) per key, tagging modifications aside.
     """
     keys = mcl.read_keys(frozen_list(genome, "Biosample-Keys.txt"))
-    return mcl.tf_experiments(frozen_list(genome, "TF-List.All.txt"), keys)
+    return mcl.tf_experiments(frozen_list(genome, "TF-List-All.txt"), keys)
 
 
 def cell_type_files(genome):
@@ -182,7 +182,7 @@ rule master_cell_list:
             mark.lower(): (lambda w, mark=mark: frozen(w.genome, f"{mark}-List.txt"))
             for mark in mcl.MARKS
         },
-        tf_list=lambda w: frozen(w.genome, "TF-List.All.txt"),
+        tf_list=lambda w: frozen(w.genome, "TF-List-All.txt"),
         biosample_keys=lambda w: frozen(w.genome, "Biosample-Keys.txt"),
     output:
         f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
@@ -213,8 +213,8 @@ rule cell_type_ccres:
     input:
         unpack(cell_type_inputs),
         master=f"{OUTDIR}/{{genome}}/{{genome}}-cCREs-Unfiltered.bed",
-        tss=lambda w: frozen(w.genome, "TSS.Basic.bed"),
-        tss_4k=lambda w: frozen(w.genome, "TSS.Basic.4K.bed"),
+        tss=lambda w: frozen(w.genome, "TSS-Basic.bed"),
+        tss_4k=lambda w: frozen(w.genome, "TSS-Basic-4K.bed"),
         autosql=lambda w: frozen(w.genome, "cres.as"),
         chrom_sizes=lambda w: frozen(w.genome, "chromInfo.txt"),
     output:
@@ -224,7 +224,7 @@ rule cell_type_ccres:
     params:
         flags=cell_type_flags,
     wildcard_constraints:
-        cts=r"[A-Za-z0-9_]+",
+        cts=r"ENCSR\d{3}[A-Z]{3}",
     log:
         f"{LOGDIR}/cell_type_ccres/{{genome}}/{{cts}}.txt",
     benchmark:
@@ -252,7 +252,7 @@ rule cell_type_ccres:
 rule pls_genes:
     input:
         ccres=f"{OUTDIR}/{{genome}}/{{genome}}-cCREs-Unfiltered.bed",
-        tss=lambda w: frozen(w.genome, "TSS.Basic.bed"),
+        tss=lambda w: frozen(w.genome, "TSS-Basic.bed"),
     output:
         f"{OUTDIR}/{{genome}}/{{genome}}-PLS-Gene-List.txt",
     log:

@@ -6,7 +6,7 @@ experiment, target, biosample and `<experiment>-<line>`. A peak under 150 bp
 becomes summit +-75 and one over 350 bp summit +-175, where the summit is
 start + column 10. Other peaks pass unchanged.
 
-tmp.summits holds [start + column 10, +1) of each row. A resized peak's
+tmp-summits holds [start + column 10, +1) of each row. A resized peak's
 column 10 becomes 75 or 175, so that point stays on its summit. The original
 kept the old offset, which moved the point off the summit.
 """
@@ -34,7 +34,7 @@ def build_parser():
     p.add_argument("--encode-root", required=True, help="Local ENCODE mirror.")
     p.add_argument("--download-dir", required=True, help="Downloaded ENCODE files.")
     p.add_argument("--bed", required=True, help="tmp.bed to write.")
-    p.add_argument("--summits", required=True, help="tmp.summits to write.")
+    p.add_argument("--summits", required=True, help="tmp-summits to write.")
     return p
 
 
@@ -78,7 +78,7 @@ def resized(peaks, exp, target, biosample):
 
 
 def summit_points(bed):
-    """Return the tmp.summits rows of tmp.bed rows.
+    """Return the tmp-summits rows of tmp.bed rows.
 
     Parameters
     ----------
@@ -95,7 +95,7 @@ def summit_points(bed):
 
 
 def main(argv=None):
-    """Write tmp.bed and tmp.summits for every experiment of the list.
+    """Write tmp.bed and tmp-summits for every experiment of the list.
 
     Parameters
     ----------

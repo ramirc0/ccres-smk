@@ -50,7 +50,7 @@ def build_parser():
     p = argparse.ArgumentParser(description="Build the master cell list.")
     for mark in MARKS:
         p.add_argument(f"--{mark.lower()}", required=True, help=f"{mark} list.")
-    p.add_argument("--tf-list", required=True, help="TF-List.All.txt.")
+    p.add_argument("--tf-list", required=True, help="TF-List-All.txt.")
     p.add_argument("--keys", required=True, help="Biosample-Keys.txt.")
     p.add_argument("-o", "--output", required=True, help="Master cell list to write.")
     return p
@@ -96,7 +96,7 @@ def tf_experiments(tf_list, keys):
     Parameters
     ----------
     tf_list : str
-        TF-List.All.txt.
+        TF-List-All.txt.
     keys : dict
         Output of `read_keys`.
 
@@ -123,7 +123,7 @@ def master_rows(mark_lists, tf_list, keys):
         DNase, H3K4me3, H3K27ac and CTCF lists, in that order. Columns:
         experiment, file, biosample name.
     tf_list : str
-        TF-List.All.txt.
+        TF-List-All.txt.
     keys : str
         Biosample-Keys.txt.
 
@@ -155,11 +155,17 @@ def master_rows(mark_lists, tf_list, keys):
             files += best[:2] if best else [MISSING, MISSING]
         group = GROUPS["".join("N" if f == MISSING else "Y" for f in files[::2])]
         rows.append([*files, names[key], group, "yes" if key in with_tf else "no", key])
+    ids = [output_name(r) for r in rows]
+    if len(set(ids)) < len(ids):
+        raise ValueError("Two rows share a first experiment, so their files would too.")
     return [r for r in rows if r[10] == "yes"] + [r for r in rows if r[10] == "no"]
 
 
 def output_name(row):
-    """Return the name of a biosample's cCRE file, as the Split scripts build it.
+    """Return the name of a biosample's cCRE files.
+
+    The Split scripts joined the row's file accessions. A row's first
+    experiment is unique to it, since an experiment has one biosample key.
 
     Parameters
     ----------
@@ -169,13 +175,10 @@ def output_name(row):
     Returns
     -------
     str
-        File accessions joined by `_`, absent marks dropped. Without DNase,
-        the name starts at H3K4me3.
+        Accession of the row's first experiment, in the order DNase,
+        H3K4me3, H3K27ac, CTCF.
     """
-    if row[0] != MISSING:
-        return "_".join(row[1:8:2]).replace("_" + MISSING, "")
-    joined = "_".join(row[3:8:2])
-    return joined.replace("_" + MISSING, "").replace(MISSING + "_", "")
+    return next(exp for exp in row[0:8:2] if exp != MISSING)
 
 
 def main(argv=None):
