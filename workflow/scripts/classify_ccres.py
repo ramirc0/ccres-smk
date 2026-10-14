@@ -3,10 +3,11 @@
 Port of 6_Classify-cCREs.sh. Anchors with DNase max z > 1.64 split into TSS,
 proximal and distal groups (see `_cres.tss_groups`). Each group then splits by
 max z > 1.64 of H3K4me3, H3K27ac and CTCF into PLS, pELS, dELS, CA-H3K4me3,
-CA-CTCF and CA. CA anchors overlapping a TF cluster become CA-TF. Any other
-anchor overlapping a TF cluster becomes TF. The cCREs are sorted with
-`sort -k1,1 -k2,2n` and accessioned, reusing the accessions of identical
-V1-V3 cCREs.
+CA-CTCF and CA. CA anchors overlapping a TF cluster become CA-TF. Anchors with
+DNase max z <= 1.64 that overlap a TF cluster become TF, whatever their
+H3K4me3, H3K27ac and CTCF z-scores. The paper describes TF cCREs as low in
+histone marks too. The cCREs are sorted with `sort -k1,1 -k2,2n` and
+accessioned, reusing the accessions of identical V1-V3 cCREs.
 """
 
 import argparse

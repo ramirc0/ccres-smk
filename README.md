@@ -72,6 +72,9 @@ for hg38, 0.203923 for mm10). The run keeps the release values. `derive_constant
 data give next to them: the largest FDR order in the hotspot files and the 10th percentile of the
 DHS-All signal.
 
+Steps 4-5 score ATAC like the other assays, but steps 6-8 never read its z-scores. ATAC sets no
+class, though the paper's Fig. 1 lists it among the classifying signals.
+
 ## Inputs
 
 `freeze_input` copies each source in `config.yaml` to `data/inputs/<genome>/` and fails unless the

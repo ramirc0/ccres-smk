@@ -3,8 +3,9 @@
 Port of the end of 3_Curate-TF-Clusters.sh with filter-tf-rpeaks.py. Each
 rPeak collects the experiments, targets and biosamples of the summits it
 overlaps (`bedtools intersect -wo`). rPeaks with summits from at least 5
-experiments are the TF clusters, in rPeak order. Clusters that overlap no rDHS
-get TF accessions in order.
+experiments are the TF clusters, in rPeak order. Five experiments of one TF
+count as five, though the paper's SI speaks of five transcription factors.
+Clusters that overlap no rDHS get TF accessions in order.
 
 The original joined each set in Python set() order, which varies between runs.
 Here each set is joined in sorted order.
