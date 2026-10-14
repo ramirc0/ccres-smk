@@ -1,14 +1,17 @@
-"""Log z-scores of the original run, bit for bit on any host.
+"""Log z-scores that come out the same on any host.
 
 The original took `math.log(x, 10)` from glibc and summed with numpy < 2.3.
-On CPUs with FMA, glibc picks an FMA build of `log`. numpy 2.3 stopped summing
-reductions in 8192-element chunks. Either changes the last bits of a z-score.
-This module ports glibc 2.39's non-FMA `log` and numpy's pairwise sum to plain
-IEEE double operations, which round the same everywhere.
+On CPUs with FMA, glibc picks an FMA build of `log`, which changes the last
+bits of a z-score. This module ports glibc 2.39's non-FMA `log` to plain IEEE
+double operations, which round the same everywhere. Sums are exact
+(`math.fsum`), so they depend on no summation order. numpy's buffered pairwise
+sum differed from them in the last bits.
 
 The log tables and coefficients are glibc's sysdeps/ieee754/dbl-64/e_log_data.c
 (LGPL-2.1-or-later), copied as hex floats.
 """
+
+import math
 
 import numpy as np
 
@@ -312,11 +315,6 @@ _NEAR_LO = np.float64(1.0 - 2**-4).view(np.uint64)
 _NEAR_HI = np.float64(1.0 + float.fromhex("0x1.09p-4")).view(np.uint64)
 _TABLE_BITS = 7
 
-# numpy < 2.3 reduced contiguous arrays in buffers of this many elements.
-_BUFFER = 8192
-# numpy's pairwise sum adds blocks of up to this many elements with 8 accumulators.
-_BLOCK = 128
-
 
 def log(x):
     """Return the natural log, bit-identical to glibc 2.39's non-FMA `log`.
@@ -408,63 +406,8 @@ def log10(x):
     return log(x) / log(np.array([10.0]))[0]
 
 
-def pairwise_sum(a):
-    """Sum like numpy's `pairwise_sum_DOUBLE`, the loop of `np.add.reduce`.
-
-    Parameters
-    ----------
-    a : numpy.ndarray
-        Values, float64.
-
-    Returns
-    -------
-    float
-        Their sum, rounded at each step as numpy rounds.
-    """
-    n = len(a)
-    if n < 8:
-        res = -0.0
-        for v in a.tolist():
-            res += v
-        return res
-    if n <= _BLOCK:
-        full = n - n % 8
-        r = a[:8].copy()
-        for row in a[8:full].reshape(-1, 8):
-            r += row
-        res = ((r[0] + r[1]) + (r[2] + r[3])) + ((r[4] + r[5]) + (r[6] + r[7]))
-        for v in a[full:].tolist():
-            res += v
-        return float(res)
-    half = n // 2
-    half -= half % 8
-    return pairwise_sum(a[:half]) + pairwise_sum(a[half:])
-
-
-def buffered_sum(a):
-    """Sum like `np.add.reduce` of numpy < 2.3 over a contiguous array.
-
-    That numpy reduced 8192-element buffers with the pairwise sum, then added
-    the buffer sums in order.
-
-    Parameters
-    ----------
-    a : numpy.ndarray
-        Values, float64.
-
-    Returns
-    -------
-    float
-        Their sum.
-    """
-    total = -0.0
-    for start in range(0, len(a), _BUFFER):
-        total += pairwise_sum(a[start : start + _BUFFER])
-    return total
-
-
 def mean_std(a):
-    """Return `numpy.mean(a)` and `numpy.std(a)` as numpy < 2.3 computed them.
+    """Return the mean and population standard deviation from exact sums.
 
     Parameters
     ----------
@@ -474,9 +417,9 @@ def mean_std(a):
     Returns
     -------
     tuple of float
-        Mean and population standard deviation.
+        Mean and population standard deviation. Each sum is rounded once.
     """
     n = len(a)
-    mean = buffered_sum(a) / n
+    mean = math.fsum(a.tolist()) / n
     deviation = a - mean
-    return mean, float(np.sqrt(buffered_sum(deviation * deviation) / n))
+    return mean, math.sqrt(math.fsum((deviation * deviation).tolist()) / n)

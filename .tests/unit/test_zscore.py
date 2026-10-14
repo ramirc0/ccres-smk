@@ -1,4 +1,4 @@
-"""Tests of the host-independent log and summation of _zscore."""
+"""Tests of the host-independent log and the exact mean of _zscore."""
 
 import os
 import subprocess
@@ -6,7 +6,6 @@ import sys
 
 import _zscore
 import numpy as np
-import pytest
 
 REFERENCE = """
 import math, sys, numpy as np
@@ -15,23 +14,12 @@ np.array([math.log(v, 10) for v in x.tolist()]).tofile(sys.argv[2])
 """
 
 
-@pytest.mark.parametrize("seed", range(3))
-def test_pairwise_sum_matches_numpy(seed):
-    """pairwise_sum equals np.add.reduce bit for bit up to one 8192 buffer."""
-    rng = np.random.default_rng(seed)
-    sizes = [*range(1, 300), *rng.integers(300, 8193, 200).tolist(), 8192]
-    for n in sizes:
-        a = rng.normal(0, 1, n) * 10.0 ** rng.integers(-3, 4, n)
-        assert _zscore.pairwise_sum(a) == np.add.reduce(a), n
-
-
-def test_buffered_sum_chunks():
-    """buffered_sum adds pairwise sums of consecutive 8192-element buffers."""
-    a = np.random.default_rng(0).normal(0, 1, 3 * 8192 + 17)
-    expected = -0.0
-    for start in range(0, len(a), 8192):
-        expected += float(np.add.reduce(a[start : start + 8192]))
-    assert _zscore.buffered_sum(a) == expected
+def test_mean_std_sums_exactly():
+    """Round each sum once, whatever the order of the values."""
+    assert _zscore.mean_std(np.array([1e16, 1.0, -1e16, 3.0]))[0] == 1.0
+    rng = np.random.default_rng(0)
+    a = rng.normal(0, 1, 100_003) * 10.0 ** rng.integers(-3, 4, 100_003)
+    assert _zscore.mean_std(a) == _zscore.mean_std(rng.permutation(a))
 
 
 def test_log10_matches_glibc_without_fma(tmp_path):

@@ -28,7 +28,7 @@ workflow/
   scripts/               argparse scripts, each with build_parser() + main()
     _bed.py              exact BED text IO, en_US GNU sort, bedtools 2.30.0 interval ops
     _registry.py         representative-peak loop, region accessions
-    _zscore.py           glibc's non-FMA log and numpy's buffered pairwise sum
+    _zscore.py           glibc's non-FMA log, exact sums
     _cres.py             selections by key and z-score, the TSS/proximal/distal split
     _encode.py           ENCODE file paths: local mirror, then downloads
   envs/pixi.toml         rule env (pixi workspace)
