@@ -117,6 +117,7 @@ Follow the [Nextstrain Snakemake style guide][style-guide] and
 - Every interpolation quoted with `:q`; config mapped into `shell` via `params:`.
 - `input:`/`output:` are literal path strings; all paths relative.
 - Logs tee'd to file and terminal (`exec &> >(tee {log:q})`).
+- Shell blocks end with `sync {output:q}`, so a job ends only once its outputs are on disk.
 - Every rule has a `log:`, `benchmark:` and `software:`.
 - Scripts are called as `{workflow.basedir:q}/scripts/x.py`.
 - Docstrings follow numpydoc. `pixi run lint` checks the scripts with ruff and `numpydoc lint`.

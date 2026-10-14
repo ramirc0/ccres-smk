@@ -107,7 +107,6 @@ def main(argv=None):
         }
     )
     _bed.write_tsv(table[_bed.gnu_sort(table, ["name"])], args.output)
-    _bed.sync(args.output)
 
 
 if __name__ == "__main__":

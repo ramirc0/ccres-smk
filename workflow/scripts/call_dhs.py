@@ -282,7 +282,6 @@ def main(argv=None):
     dhs, excluded = sweep(track, args.min_p)
     write(track, dhs, args.dhs)
     write(track, excluded, args.excluded)
-    _bed.sync(args.dhs, args.excluded)
 
 
 if __name__ == "__main__":

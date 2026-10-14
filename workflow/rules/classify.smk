@@ -36,6 +36,8 @@ rule classify_ccres:
             --previous {input.previous:q} \
             --genome {wildcards.genome:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -195,6 +197,8 @@ rule master_cell_list:
             --ctcf {input.ctcf:q} \
             --tf-list {input.tf_list:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -216,6 +220,8 @@ rule frozen_master_cell_list:
         exec &> >(tee {log:q})
 
         cp {input:q} {output:q}
+
+        sync {output:q}
         """
 
 
@@ -254,6 +260,8 @@ rule cell_type_ccres:
             --chrom-sizes {input.chrom_sizes:q} \
             --output {output.bed:q} \
             --bigbed {output.bigbed:q}
+
+        sync {output:q}
         """
 
 
@@ -279,4 +287,6 @@ rule pls_genes:
             --tss {input.tss:q} \
             --tss-4k {input.tss_4k:q} \
             --output {output:q}
+
+        sync {output:q}
         """

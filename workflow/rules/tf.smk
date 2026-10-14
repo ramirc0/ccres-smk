@@ -21,6 +21,8 @@ rule tf_list:
         python {workflow.basedir:q}/scripts/tf_list.py \
             --input {input:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -77,6 +79,8 @@ rule tf_peaks:
             --exclude {params.excluded:q} \
             --bed {output.bed:q} \
             --summits {output.summits:q}
+
+        sync {output:q}
         """
 
 
@@ -98,6 +102,8 @@ rule tf_rpeaks:
         python {workflow.basedir:q}/scripts/tf_rpeaks.py \
             --bed {input:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -130,4 +136,6 @@ rule tf_clusters:
             --no-overlap {output.no_overlap:q} \
             --summary {output.summary:q} \
             --rtfbs {output.rtfbs:q}
+
+        sync {output:q}
         """

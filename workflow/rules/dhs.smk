@@ -46,6 +46,8 @@ rule call_dhs:
             --min-p {params.min_p:q} \
             --dhs {output.dhs:q} \
             --excluded {output.excluded:q}
+
+        sync {output:q}
         """
 
 
@@ -76,6 +78,8 @@ rule process_dhs:
             --peak {params.peak:q} \
             --bigwig {input.bigwig:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -105,6 +109,8 @@ rule combine_dhs:
             --cutoff {params.cutoff:q} \
             --all {output.all:q} \
             --filtered {output.filtered:q}
+
+        sync {output:q}
         """
 
 
@@ -139,6 +145,8 @@ rule create_rdhs:
             --none {output.none:q} \
             --summary {output.summary:q} \
             --rdhs {output.rdhs:q}
+
+        sync {output:q}
         """
 
 
@@ -179,4 +187,6 @@ rule derive_constants:
             --cutoff {params.cutoff:q} \
             --threads {threads:q} \
             --output {output:q}
+
+        sync {output:q}
         """

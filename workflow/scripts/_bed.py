@@ -9,7 +9,6 @@ original run, and checks that glibc still orders lines the way it did.
 """
 
 import locale
-import os
 from itertools import groupby, pairwise
 
 import numpy as np
@@ -102,26 +101,6 @@ def write_tsv(df, path):
         File to write.
     """
     lines(df).to_frame().write_csv(path, include_header=False, quote_style="never")
-
-
-def sync(*paths):
-    """Flush files to disk.
-
-    On CephFS, the first stat of a file from another host waits until the host
-    that wrote it flushes it. Snakemake's main process stats each finished job's
-    outputs in turn, so rules with thousands of jobs flush them in the job.
-
-    Parameters
-    ----------
-    *paths : str or os.PathLike
-        Files to flush.
-    """
-    for path in paths:
-        fd = os.open(path, os.O_RDONLY)
-        try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
 
 
 def collation_ranks(values):

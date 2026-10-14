@@ -61,6 +61,8 @@ rule freeze_input:
             --checksums {params.checksums:q} \
             --key {params.key:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -86,4 +88,6 @@ rule download_encode:
             --accession {wildcards.acc:q} \
             --metadata {params.metadata:q} \
             --output {output:q}
+
+        sync {output:q}
         """

@@ -356,7 +356,6 @@ def main(argv=None):
         ],
         check=True,
     )
-    _bed.sync(args.output, f"{args.output}.tbi", args.bigbed)
 
 
 def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):

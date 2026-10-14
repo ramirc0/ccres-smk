@@ -43,6 +43,8 @@ rule anchors:
             --rdhs {input.rdhs:q} \
             --rtfbs {input.rtfbs:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -67,6 +69,8 @@ rule extend_anchors:
             --anchors {input:q} \
             --width {wildcards.width:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -98,6 +102,8 @@ rule signal_zscore:
             --anchors {input.anchors:q} \
             {params.bigwig:q} \
             --output {output:q}
+
+        sync {output:q}
         """
 
 
@@ -125,4 +131,6 @@ rule max_zscore:
             --signal {params.signal:q} \
             --threads {threads} \
             --output {output:q}
+
+        sync {output:q}
         """
