@@ -2,9 +2,10 @@
 
 A Snakemake port of the ENCODE4 cCRE pipeline
 ([weng-lab/ENCODE-cCREs, Version-4/cCRE-Pipeline](https://github.com/weng-lab/ENCODE-cCREs/tree/master/Version-4/cCRE-Pipeline),
-steps 0-8) for hg38 and mm10. Outputs MUST match the May 2022 V7 release byte for byte. Where the
-original depends on the host or on set and glob order, the port fixes it, and its output becomes the
-new baseline.
+steps 0-8) for hg38 and mm10. Tag `parity` marks the commit whose outputs match the May 2022 V7
+release byte for byte. It departs from the release only where the original depends on the host or
+on set and glob order. Commits after `parity` MAY change outputs to fix bugs in the original method.
+Their outputs are not guaranteed to match the release.
 
 ## Layout
 
