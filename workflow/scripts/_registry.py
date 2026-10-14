@@ -73,13 +73,13 @@ def previous_accessions(rows, mode):
 
     Returns
     -------
-    tuple of (dict of str to str, int)
-        Accession per concatenated `chrom + start + end` key, last row winning,
-        and the largest accession number.
+    tuple of (dict of tuple of str to str, int)
+        Accession per `(chrom, start, end)`, last row winning, and the largest
+        accession number.
     """
     previous, top = {}, 0
     for chrom, start, end, accession, *_ in rows:
-        previous[chrom + start + end] = accession
+        previous[chrom, start, end] = accession
         top = max(top, int(accession.split(MODE_ID[mode])[-1]))
     return previous, top
 
@@ -87,10 +87,10 @@ def previous_accessions(rows, mode):
 def accessions(regions, genome, mode, previous=None):
     """Assign accessions to regions like make-region-accession.py.
 
-    A region whose `chrom + start + end` string matches a previous region
-    reuses that accession, with EH37 renamed EH38. The key has no separators,
-    so distinct coordinates can collide. That quirk is kept. Other regions
-    get new numbers above the previous maximum, in input order.
+    A region with the chrom, start and end of a previous region reuses that
+    accession, with EH37 renamed EH38. The script keyed regions on
+    `chrom + start + end`, so distinct coordinates could collide. Other
+    regions get new numbers above the previous maximum, in input order.
 
     Parameters
     ----------
@@ -112,10 +112,9 @@ def accessions(regions, genome, mode, previous=None):
     prefix = GENOME_ID[genome] + MODE_ID[mode]
     out = []
     i = top + 1
-    for chrom, start, end in regions:
-        key = chrom + start + end
-        if key in known:
-            out.append(known[key].replace("EH37", "EH38"))
+    for region in regions:
+        if region in known:
+            out.append(known[region].replace("EH37", "EH38"))
         else:
             out.append(f"{prefix}{i:07d}")
             i += 1

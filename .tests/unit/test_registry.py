@@ -117,15 +117,11 @@ def test_representative_peaks(bedtools, original, tmp_path, seed, duplicate_name
 
 
 def test_accessions(original, tmp_path):
-    """Accessions reproduces make-region-accession.py, key collisions included."""
+    """Accessions reproduces make-region-accession.py without key collisions."""
     rng = np.random.default_rng(0)
     start = rng.integers(1, 5000, 400)
     regions = [("chr1", str(s), str(s + 200)) for s in start]
-    regions += [
-        ("chr1", "1003", "310250"),
-        ("chr1", "10033", "10250"),
-        ("chr11", "2", "3"),
-    ]
+    regions += [("chr1", "10033", "10250")]
     previous = [
         ("chr1", str(s), str(s + 200), f"EH37D{i:07d}", "V1")
         for i, s in enumerate(start[::3])
@@ -155,3 +151,18 @@ def test_accessions(original, tmp_path):
         check=True,
     ).stdout
     assert "".join("\t".join(r) + f"\t{a}\n" for r, a in zip(regions, ours)) == expected
+
+
+def test_accessions_key_on_coordinates():
+    """Reuse a previous accession only for the same chrom, start and end."""
+    previous = [
+        ("chr1", "10033", "10250", "EH37D0999999", "V2"),
+        ("chr1", "12", "3", "EH37D0000007", "V3"),
+    ]
+    regions = [("chr1", "1003", "310250"), ("chr11", "2", "3"), ("chr1", "12", "3")]
+    known = _registry.previous_accessions(previous, "rDHS")
+    assert _registry.accessions(regions, "hg38", "rDHS", known) == [
+        "EH38D1000000",
+        "EH38D1000001",
+        "EH38D0000007",
+    ]
