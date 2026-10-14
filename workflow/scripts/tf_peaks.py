@@ -33,12 +33,6 @@ def build_parser():
     p.add_argument("--tf-list", required=True, help="Filtered TF experiment list.")
     p.add_argument("--encode-root", required=True, help="Local ENCODE mirror.")
     p.add_argument("--download-dir", required=True, help="Downloaded ENCODE files.")
-    p.add_argument(
-        "--exclude",
-        nargs="*",
-        default=[],
-        help="Experiments whose peaks the original run could not fetch.",
-    )
     p.add_argument("--bed", required=True, help="tmp.bed to write.")
     p.add_argument("--summits", required=True, help="tmp.summits to write.")
     return p
@@ -111,8 +105,6 @@ def main(argv=None):
         rows = [line.rstrip("\n").split("\t") for line in f]
     with open(args.bed, "w") as bed_out, open(args.summits, "w") as summit_out:
         for exp, peak, biosample, target, *_ in rows:
-            if exp in args.exclude:
-                continue
             path = _encode.encode_path(
                 args.encode_root, args.download_dir, exp, peak, "bed.gz"
             )

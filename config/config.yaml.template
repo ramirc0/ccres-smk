@@ -13,18 +13,13 @@ encode_metadata: /home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/
 #   is hardcoded to hg38, so the mm10 value is unverified.
 # dhs_signal_cutoff: 2_Create-rDHSs.sh, "10% of 10,000,000 randomly selected
 #   DHSs". The sample and its seed were not kept.
-# tf_excluded: step 3 experiments whose peak file the May 2022 run lacked.
-#   ENCSR008LHT's reached the mirror in June 2022 and has no peaks in tmp.summits.
-#   Step 7 ran two weeks after step 3 and used its peaks.
 genomes:
   hg38:
     min_p: 4942
     dhs_signal_cutoff: 0.145873
-    tf_excluded: [ENCSR008LHT]
   mm10:
     min_p: 4942
     dhs_signal_cutoff: 0.203923
-    tf_excluded: []
 
 # Frozen input name -> source file(s). freeze_input copies a single source.
 # The two derived inputs filter their sources (see workflow/scripts/freeze_input.py).

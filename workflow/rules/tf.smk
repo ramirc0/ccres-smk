@@ -40,11 +40,9 @@ def tf_rows(genome):
     Returns
     -------
     list of list of str
-        TF-List.All.txt rows that pass, excluded experiments left out.
+        TF-List.All.txt rows that pass.
     """
-    excluded = config["genomes"][genome]["tf_excluded"]
-    rows = read_rows(frozen_list(genome, "TF-List.All.txt"))
-    return [r for r in rows if tfl.passes(r) and r[0] not in excluded]
+    return [r for r in read_rows(frozen_list(genome, "TF-List.All.txt")) if tfl.passes(r)]
 
 
 rule tf_peaks:
@@ -59,7 +57,6 @@ rule tf_peaks:
     params:
         encode_root=ENCODE_ROOT,
         download_dir=DOWNLOAD_DIR,
-        excluded=lambda w: config["genomes"][w.genome]["tf_excluded"],
     log:
         f"{LOGDIR}/tf_peaks/{{genome}}.txt",
     benchmark:
@@ -74,7 +71,6 @@ rule tf_peaks:
             --tf-list {input.tf_list:q} \
             --encode-root {params.encode_root:q} \
             --download-dir {params.download_dir:q} \
-            --exclude {params.excluded:q} \
             --bed {output.bed:q} \
             --summits {output.summits:q}
 
