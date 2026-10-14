@@ -62,15 +62,15 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 | 7 | `master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/Individual-Files/<exp>.{bed.gz,bigBed}` | 7_Call-Cell-Type-Specific.sh |
 | 8 | `pls_genes` | `<g>-PLS-Gene-List.txt` | 8_Assign-PLS-Gene.sh |
 
-Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where some position has
-that FDR order, since elsewhere the merged set repeats. It also drops each merged interval once it
-settles. An interval of 50-350 bp is a DHS, and one under 50 bp can only shrink, so neither changes
-the output again. The largest hotspot file (117M positions) takes under 90 s.
+Step 0 sweeps the FDR thresholds 1E-2 up to the track's largest FDR order. The release stopped at
+1E-4942, below the orders 4943 and 4944 that both genomes hold. The port merges only at thresholds
+where some position has that FDR order, since elsewhere the merged set repeats. It also drops each
+merged interval once it settles. An interval of 50-350 bp is a DHS, and one under 50 bp can only
+shrink, so neither changes the output again. The largest hotspot file (117M positions) takes under
+90 s.
 
-Steps 0 and 2 hardcode `min_p` (the last FDR threshold, 1E-4942) and `dhs_signal_cutoff` (0.145873
-for hg38, 0.203923 for mm10). The run keeps the release values. `derive_constants` writes what the
-data give next to them: the largest FDR order in the hotspot files and the 10th percentile of the
-DHS-All signal.
+Step 2 hardcodes `dhs_signal_cutoff` (0.145873 for hg38, 0.203923 for mm10). The run keeps the
+release values. `derive_constants` writes the 10th percentile of the DHS-All signal next to them.
 
 Step 7 names each biosample's files after its first experiment, in the order DNase, H3K4me3,
 H3K27ac, CTCF. The release joined the file accessions. Names the port invents use letters, digits

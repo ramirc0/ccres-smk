@@ -1,11 +1,12 @@
 """Step 0: call DHSs from one Hotspot2 FDR track by the threshold sweep.
 
 Port of 0_Call-DHSs.sh with filter-long-double.py. At each threshold 1E-j,
-j = 2..min_p, the original kept the positions whose FDR order exceeds j, merged
-them with `bedtools merge -d 1 -c 5 -o min` and dropped merged intervals under
-50 bp. The 1E-2 intervals of at most 350 bp are DHSs. At each later threshold,
-intervals of at most 350 bp that overlap no DHS yet join them. The 1E-min_p
-intervals that overlap no DHS are the excluded ones.
+the original kept the positions whose FDR order exceeds j, merged them with
+`bedtools merge -d 1 -c 5 -o min` and dropped merged intervals under 50 bp.
+The 1E-2 intervals of at most 350 bp are DHSs. At each later threshold,
+intervals of at most 350 bp that overlap no DHS yet join them. The intervals
+of the last threshold that overlap no DHS are the excluded ones. The script
+stopped at 1E-4942. The sweep here runs to the track's largest FDR order.
 
 A threshold changes the kept positions only where some position has exactly
 that FDR order, so this port merges only at those thresholds. Elsewhere the
@@ -36,9 +37,6 @@ def build_parser():
     """
     p = argparse.ArgumentParser(description="Call DHSs from a Hotspot2 FDR track.")
     p.add_argument("--hotspots", required=True, help="Hotspot2 BED, gzipped.")
-    p.add_argument(
-        "--min-p", type=int, required=True, help="Last threshold, 1E-<min_p>."
-    )
     p.add_argument("--dhs", required=True, help="DHS BED to write.")
     p.add_argument("--excluded", required=True, help="Excluded BED to write.")
     return p
@@ -206,8 +204,8 @@ def _sweep(codes, starts, ends, fdrs, orders, thresholds):
     )
 
 
-def sweep(track, min_p):
-    """Run the threshold sweep.
+def sweep(track):
+    """Run the threshold sweep, up to the track's largest FDR order.
 
     Merged intervals only split as the threshold rises. An interval of 50-350 bp
     becomes a DHS, and its pieces could only overlap it later. An interval under
@@ -220,8 +218,6 @@ def sweep(track, min_p):
     ----------
     track : Track
         Hotspot positions.
-    min_p : int
-        Last threshold, 1E-<min_p>.
 
     Returns
     -------
@@ -229,7 +225,7 @@ def sweep(track, min_p):
         First row, end and min FDR of the DHSs in calling order, threshold by
         threshold, and of the excluded intervals.
     """
-    changes = np.unique(track.orders[(track.orders >= 3) & (track.orders <= min_p)])
+    changes = np.unique(track.orders[(track.orders >= 3) & (track.orders < KEEP)])
     found = _sweep(
         track.codes,
         track.starts,
@@ -280,7 +276,7 @@ def main(argv=None):
     track = Track(
         _bed.read_tsv(args.hotspots, ["chrom", "start", "end", "name", "fdr"])
     )
-    dhs, excluded = sweep(track, args.min_p)
+    dhs, excluded = sweep(track)
     write(track, dhs, args.dhs)
     write(track, excluded, args.excluded)
 

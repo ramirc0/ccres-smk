@@ -29,8 +29,6 @@ rule call_dhs:
     output:
         dhs=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-DHSs.bed",
         excluded=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-Excluded.bed",
-    params:
-        min_p=lambda w: config["genomes"][w.genome]["min_p"],
     log:
         f"{LOGDIR}/call_dhs/{{genome}}/{{acc}}.txt",
     benchmark:
@@ -43,7 +41,6 @@ rule call_dhs:
 
         python {workflow.basedir:q}/scripts/call_dhs.py \
             --hotspots {input:q} \
-            --min-p {params.min_p:q} \
             --dhs {output.dhs:q} \
             --excluded {output.excluded:q}
 
@@ -150,24 +147,15 @@ rule create_rdhs:
         """
 
 
-# Reports the data-derived values of the hardcoded constants. The run keeps the
-# release values.
+# Reports the data-derived value of the hardcoded cutoff. The run keeps the
+# release value.
 rule derive_constants:
     input:
-        hotspots=lambda w: frozen(w.genome, "Hotspot-List.txt"),
-        peaks=lambda w: [
-            ancient(encode_file(r[0], r[1], "bed.gz"))
-            for r in read_rows(frozen_list(w.genome, "Hotspot-List.txt"))
-        ],
-        dhs_all=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
+        f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
     output:
         f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-Constants.tsv",
     params:
-        encode_root=ENCODE_ROOT,
-        download_dir=DOWNLOAD_DIR,
-        min_p=lambda w: config["genomes"][w.genome]["min_p"],
         cutoff=lambda w: config["genomes"][w.genome]["dhs_signal_cutoff"],
-    threads: 8
     log:
         f"{LOGDIR}/derive_constants/{{genome}}.txt",
     benchmark:
@@ -179,13 +167,8 @@ rule derive_constants:
         exec &> >(tee {log:q})
 
         python {workflow.basedir:q}/scripts/derive_constants.py \
-            --hotspots {input.hotspots:q} \
-            --encode-root {params.encode_root:q} \
-            --download-dir {params.download_dir:q} \
-            --dhs-all {input.dhs_all:q} \
-            --min-p {params.min_p:q} \
+            --dhs-all {input:q} \
             --cutoff {params.cutoff:q} \
-            --threads {threads:q} \
             --output {output:q}
 
         sync {output:q}

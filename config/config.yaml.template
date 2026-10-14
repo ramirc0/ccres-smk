@@ -9,19 +9,15 @@ download_dir: data/encode                    # same layout, for files missing fr
 # reads file.parquet (s3_uri, md5sum). The derived lists read the rest.
 encode_metadata: /home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/parquets
 
-# Constants hardcoded in the original scripts. No published code derives them.
-# min_p: minP in 0_Call-DHSs.sh (last FDR threshold, 1E-<min_p>). That script
-#   is hardcoded to hg38, so the mm10 value is unverified.
-# dhs_signal_cutoff: 2_Create-rDHSs.sh, "10% of 10,000,000 randomly selected
-#   DHSs". The sample and its seed were not kept.
+# dhs_signal_cutoff: hardcoded in 2_Create-rDHSs.sh, "10% of 10,000,000 randomly
+#   selected DHSs". No published code derives it. The sample and its seed were
+#   not kept.
 genomes:
   hg38:
     assembly: GRCh38        # ENCODE's name, for the derived lists
-    min_p: 4942
     dhs_signal_cutoff: 0.145873
   mm10:
     assembly: mm10
-    min_p: 4942
     dhs_signal_cutoff: 0.203923
 
 # Frozen input name -> its source, which freeze_input copies, or how to derive
