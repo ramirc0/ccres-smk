@@ -17,10 +17,15 @@ def mark_signal_files(genome, mark):
     Returns
     -------
     list of str
-        One z-score table per row of the mark list.
+        One z-score table per row of the mark list. Rows whose file is NA
+        have none.
     """
     rows = read_rows(frozen_list(genome, f"{mark}-List.txt"))
-    return [f"{OUTDIR}/{genome}/signal-output/{mark}/{r[0]}-{r[1]}.txt" for r in rows]
+    return [
+        f"{OUTDIR}/{genome}/signal-output/{mark}/{r[0]}-{r[1]}.txt"
+        for r in rows
+        if r[1] != "NA"
+    ]
 
 
 rule anchors:
@@ -74,20 +79,14 @@ rule extend_anchors:
         """
 
 
-# {signal} is NA for the two hg38 H3K4me3 rows without a bigWig. The original
-# wrote empty files for them, and so does this rule.
 rule signal_zscore:
     input:
         anchors=lambda w: f"{OUTDIR}/{w.genome}/signal-output/Anchors.{WIDTH[w.mark]}bp.bed",
-        bigwig=lambda w: (
-            [] if w.signal == "NA" else ancient(encode_file(w.exp, w.signal, "bigWig"))
-        ),
+        bigwig=lambda w: ancient(encode_file(w.exp, w.signal, "bigWig")),
     output:
         f"{OUTDIR}/{{genome}}/signal-output/{{mark}}/{{exp}}-{{signal}}.txt",
-    params:
-        bigwig=lambda w, input: ["--bigwig", input.bigwig] if input.bigwig else [],
     wildcard_constraints:
-        signal=r"ENCFF\d{3}[A-Z]{3}|NA",
+        signal=r"ENCFF\d{3}[A-Z]{3}",
     log:
         f"{LOGDIR}/signal_zscore/{{genome}}/{{mark}}/{{exp}}-{{signal}}.txt",
     benchmark:
@@ -100,7 +99,7 @@ rule signal_zscore:
 
         python {workflow.basedir:q}/scripts/signal_zscore.py \
             --anchors {input.anchors:q} \
-            {params.bigwig:q} \
+            --bigwig {input.bigwig:q} \
             --output {output:q}
 
         sync {output:q}

@@ -34,9 +34,7 @@ def build_parser():
     """
     p = argparse.ArgumentParser(description="Log z-score one signal track.")
     p.add_argument("--anchors", required=True, help="Widened anchor BED.")
-    p.add_argument(
-        "--bigwig", help="Signal bigWig. Without it the output is empty, as for NA."
-    )
+    p.add_argument("--bigwig", required=True, help="Signal bigWig.")
     p.add_argument("-o", "--output", required=True, help="Z-score table to write.")
     return p
 
@@ -74,10 +72,6 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    if args.bigwig is None:
-        Path(args.output).write_text("")
-        return
-
     with tempfile.TemporaryDirectory() as tmp:
         tab = Path(tmp, "out2")
         subprocess.run(

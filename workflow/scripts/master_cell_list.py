@@ -3,8 +3,8 @@
 Port of match-biosamples.py and the TF flag of 7_Call-Cell-Type-Specific.sh.
 Biosamples come in order of first appearance across the DNase, H3K4me3,
 H3K27ac and CTCF lists. A later experiment of the same mark replaces an
-earlier one. Biosamples with TF data come first, flagged yes, then the rest,
-flagged no.
+earlier one. A row whose file is NA counts as no experiment. Biosamples with
+TF data come first, flagged yes, then the rest, flagged no.
 """
 
 import argparse
@@ -83,6 +83,8 @@ def master_rows(mark_lists, tf_list):
     flags, files = {}, {}
     for mode, path in enumerate(mark_lists):
         for exp, acc, cell, *_ in read_rows(path):
+            if acc == "NA":
+                continue
             if cell not in flags:
                 flags[cell] = ["N"] * len(MARKS)
                 files[cell] = [MISSING] * (2 * len(MARKS))

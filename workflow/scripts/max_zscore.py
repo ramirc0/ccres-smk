@@ -1,7 +1,8 @@
 """Step 5: the highest z-score of each anchor across one mark's experiments.
 
-Port of 5_Determine-Max-Zscores.sh with select-max-zscore.py. The files are
-read in the en_US glob order of their names. The first seeds each anchor's
+Port of 5_Determine-Max-Zscores.sh with select-max-zscore.py. Rows whose file
+is NA have no signal file. The files are read in the en_US glob order of their
+names. The first seeds each anchor's
 value, and a later value replaces it only if it is greater. Rows keep the
 first file's order. Values print with Python's str().
 """
@@ -58,19 +59,14 @@ def main(argv=None):
     """
     args = build_parser().parse_args(argv)
     with open(args.mark_list) as f:
-        names = [
-            "{}-{}.txt".format(*line.split("\t")[:2]) for line in f if line.strip()
-        ]
+        rows = [line.split("\t") for line in f if line.strip()]
+    names = [f"{exp}-{acc}.txt" for exp, acc, *_ in rows if acc != "NA"]
     paths = [Path(args.signal, n) for n in sorted(names, key=locale.strxfrm)]
 
     with ThreadPoolExecutor(args.threads) as pool:
         tables = pool.map(read_z, paths)
         anchors, best = next(tables)
-        if anchors.is_empty():
-            raise ValueError(f"{paths[0]} is empty. The original would crash here.")
         for names_i, z in tables:
-            if names_i.is_empty():
-                continue
             if not names_i.equals(anchors):
                 raise ValueError("Signal files list different anchors.")
             # A NaN never wins `>`, as in the original.
