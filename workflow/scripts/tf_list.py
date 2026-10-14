@@ -1,15 +1,14 @@
 r"""Step 3: keep the TF ChIP-seq experiments with FRiP > 0.003 and a peak file.
 
-Ports `awk -F "\t" '{if ($5 > 0.003 && $2 != "NA") print $0}'`. awk compares
-a FRiP that does not look numeric, such as NA, as a string, so it passes.
+The original filtered with `awk -F "\t" '{if ($5 > 0.003 && $2 != "NA") ...}'`.
+awk compared a FRiP that does not look numeric, such as NA, as text, so it
+passed. Here a FRiP must be a finite number.
 """
 
 import argparse
-import re
+import math
 
-# A field awk treats as a number.
-AWK_NUMBER = re.compile(r"[ \t\n]*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?[ \t\n]*")
-MIN_FRIP = "0.003"
+MIN_FRIP = 0.003
 
 
 def build_parser():
@@ -23,31 +22,8 @@ def build_parser():
     p = argparse.ArgumentParser(description="Filter the TF experiment list.")
     p.add_argument("-i", "--input", required=True, help="TF-List.All.txt.")
     p.add_argument("-o", "--output", required=True, help="Filtered list to write.")
-    p.add_argument(
-        "--min-frip", default=MIN_FRIP, help="FRiP threshold, as written in awk."
-    )
+    p.add_argument("--min-frip", type=float, default=MIN_FRIP, help="FRiP threshold.")
     return p
-
-
-def awk_greater(field, constant):
-    """Compare a field with a numeric constant as awk does.
-
-    Parameters
-    ----------
-    field : str
-        Field text.
-    constant : str
-        Numeric constant, as written in the awk program. awk prints it with
-        CONVFMT (%.6g) when the comparison is a string comparison.
-
-    Returns
-    -------
-    bool
-        `field > constant` under awk semantics.
-    """
-    if AWK_NUMBER.fullmatch(field):
-        return float(field) > float(constant)
-    return field > f"{float(constant):.6g}"
 
 
 def passes(fields, min_frip=MIN_FRIP):
@@ -57,16 +33,20 @@ def passes(fields, min_frip=MIN_FRIP):
     ----------
     fields : list of str
         Fields of one TF-List.All.txt line.
-    min_frip : str
-        FRiP threshold, as written in the awk program.
+    min_frip : float
+        FRiP threshold.
 
     Returns
     -------
     bool
-        True when FRiP exceeds the threshold under awk semantics and the
+        True when FRiP is a finite number above the threshold and the
         experiment has a peak file.
     """
-    return awk_greater(fields[4], min_frip) and fields[1] != "NA"
+    try:
+        frip = float(fields[4])
+    except ValueError:
+        return False
+    return math.isfinite(frip) and frip > min_frip and fields[1] != "NA"
 
 
 def main(argv=None):

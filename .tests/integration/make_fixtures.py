@@ -194,7 +194,7 @@ def build(genome):
         write(res / f"{mark}-List.txt", table)
 
     tf_all = rows(frozen / "TF-List.All.txt")
-    passing = [r for r in tf_all if tf_list.awk_greater(r[4], "0.003") and r[1] != "NA"]
+    passing = [r for r in tf_all if tf_list.passes(r)]
     counts = []
     for r in passing[:200]:
         with gzip.open(MIRROR / r[0] / f"{r[1]}.bed.gz", "rt") as f:
