@@ -5,7 +5,7 @@ master cell list row: TF when the biosample has DNase and TF data, DNase when
 it has DNase only, No-DNase without DNase. A mark the biosample lacks reads as
 the placeholder blank.txt. Every cCRE of the release appears once per class it
 gets, then rows are sorted with `sort -k1,1 -k2,2n` and labelled by data
-completeness. The result is bgzipped and tabix-indexed.
+completeness. The result is bgzipped, tabix-indexed and written as a bigBed.
 
 DNase and TF: cCREs with DNase z > 1.64 in the biosample split into TSS,
 proximal and distal groups, then into PLS, pELS, dELS, CA-H3K4me3 and CA-CTCF
@@ -71,7 +71,10 @@ def build_parser():
     )
     p.add_argument("--encode-root", help="Local ENCODE mirror.")
     p.add_argument("--download-dir", help="Downloaded ENCODE files.")
+    p.add_argument("--autosql", required=True, help="autoSql of the bigBed fields.")
+    p.add_argument("--chrom-sizes", required=True, help="Chromosome sizes.")
     p.add_argument("-o", "--output", required=True, help="BED.gz to write and index.")
+    p.add_argument("--bigbed", required=True, help="bigBed to write.")
     return p
 
 
@@ -297,7 +300,7 @@ def tf_summits(args):
 
 
 def main(argv=None):
-    """Write the biosample's classified cCREs, bgzipped and indexed.
+    """Write the biosample's classified cCREs as an indexed BED.gz and a bigBed.
 
     Parameters
     ----------
@@ -342,7 +345,18 @@ def main(argv=None):
         with open(args.output, "wb") as out:
             subprocess.run(["bgzip", "-c", bed_path], stdout=out, check=True)
     subprocess.run(["tabix", "-f", "-p", "bed", args.output], check=True)
-    _bed.sync(args.output, f"{args.output}.tbi")
+    subprocess.run(
+        [
+            "bedToBigBed",
+            "-type=bed9+2",
+            f"-as={args.autosql}",
+            args.output,
+            args.chrom_sizes,
+            args.bigbed,
+        ],
+        check=True,
+    )
+    _bed.sync(args.output, f"{args.output}.tbi", args.bigbed)
 
 
 def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
