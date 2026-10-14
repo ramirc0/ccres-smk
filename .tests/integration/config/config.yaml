@@ -5,8 +5,9 @@ run_id: v7               # outputs go under <outdir>/<run_id>/<genome>/; overrid
 inputs_dir: data/inputs                      # frozen inputs, checked against config/inputs.b3
 encode_root: resources/encode      # ENCODE mirror, <exp>/<file>.<ext>
 download_dir: data/encode                    # same layout, for files missing from the mirror
-# ENCODE file report snapshot (s3_uri, md5sum) used by download_encode.
-encode_metadata: /home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/parquets/file.parquet
+# ENCODE metadata snapshot, one Parquet file per object type. download_encode
+# reads file.parquet (s3_uri, md5sum), Biosample-Keys.txt the biosamples.
+encode_metadata: resources/metadata
 
 # Constants hardcoded in the original scripts. No published code derives them.
 # min_p: minP in 0_Call-DHSs.sh (last FDR threshold, 1E-<min_p>). That script
@@ -22,8 +23,8 @@ genomes:
     dhs_signal_cutoff: 0.203923
 
 # Frozen input name -> source file(s). freeze_input copies a single source.
-# The two derived inputs filter their sources (see workflow/scripts/freeze_input.py).
-# A Master-Cell-List.txt source replaces the step 7 master list built from the lists.
+# The derived inputs filter their sources (see workflow/scripts/freeze_input.py).
+# Biosample-Keys.txt, derived from the frozen lists and encode_metadata, has none.
 sources:
   hg38:
     Hotspot-List.txt: resources/hg38/Hotspot-List.txt
@@ -62,4 +63,3 @@ sources:
       - resources/mm10/TF-Filtered.txt
       - resources/mm10/TF-Biosamples.txt
       - resources/mm10/Master-Cell-List.txt
-    Master-Cell-List.txt: resources/mm10/Master-Cell-List.txt

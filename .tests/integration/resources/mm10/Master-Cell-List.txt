@@ -1,3 +1,1 @@
-ENCSR789AYI	ENCFF947ZHU	ENCSR985UTP	ENCFF211IFK	ENCSR382DRK	ENCFF675NRM	ENCSR002ZAG	ENCFF826BKY	toy_tf	Group1	yes
-ENCSR789AYI	ENCFF982MGZ	---	---	ENCSR452WYC	ENCFF865CCV	---	---	toy_dnase	Group5	no
----	---	---	---	---	---	ENCSR677SIH	ENCFF355LDM	toy_nodnase	Group12	no
+---	---	---	---	---	---	---	---	toy_tf	Group1	yes

@@ -5,8 +5,9 @@ run_id: v7               # outputs go under <outdir>/<run_id>/<genome>/; overrid
 inputs_dir: data/inputs                      # frozen inputs, checked against config/inputs.b3
 encode_root: /data/projects/encode/data      # ENCODE mirror, <exp>/<file>.<ext>
 download_dir: data/encode                    # same layout, for files missing from the mirror
-# ENCODE file report snapshot (s3_uri, md5sum) used by download_encode.
-encode_metadata: /home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/parquets/file.parquet
+# ENCODE metadata snapshot, one Parquet file per object type. download_encode
+# reads file.parquet (s3_uri, md5sum), Biosample-Keys.txt the biosamples.
+encode_metadata: /home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/parquets
 
 # Constants hardcoded in the original scripts. No published code derives them.
 # min_p: minP in 0_Call-DHSs.sh (last FDR threshold, 1E-<min_p>). That script
@@ -22,8 +23,8 @@ genomes:
     dhs_signal_cutoff: 0.203923
 
 # Frozen input name -> source file(s). freeze_input copies a single source.
-# The two derived inputs filter their sources (see workflow/scripts/freeze_input.py).
-# A Master-Cell-List.txt source replaces the step 7 master list built from the lists.
+# The derived inputs filter their sources (see workflow/scripts/freeze_input.py).
+# Biosample-Keys.txt, derived from the frozen lists and encode_metadata, has none.
 sources:
   hg38:
     Hotspot-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-rDHS/hg38-Hotspot-List.txt
@@ -51,13 +52,12 @@ sources:
     CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/CTCF-List.txt
     ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/ATAC-List.txt
     TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/mm10-TF-List.All.txt
-    # The mm10 mark lists were edited in 2025, so step 7 freezes the May 2022
-    # master list. x and xx (May 31, 2022) are the TF list's columns 1-9 and 10.
+    # x and xx (May 31, 2022) are the TF list's columns 1-9 and 10. The May 2022
+    # master list names the biosamples the release flagged TF=yes.
     TF-List.Cell-Type.txt:
       - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/x
       - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/xx
       - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/Cell-Type-Specific/Old/Master-Cell-List.txt
-    Master-Cell-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/Cell-Type-Specific/Old/Master-Cell-List.txt
     cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-cDHS/Altius-cDHSs.DAC-mm10.bed
     rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.mm10.bed.gz
     cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.mm10.bed.gz

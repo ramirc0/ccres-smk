@@ -4,7 +4,29 @@
 DERIVED = {
     "cCREs-Previous.bed": "previous-ccres",
     "TF-List.Cell-Type.txt": "cell-type-tf",
+    "Biosample-Keys.txt": "biosample-keys",
 }
+# Lists whose experiments Biosample-Keys.txt keys from the metadata snapshot.
+KEYED_LISTS = [
+    *(f"{mark}-List.txt" for mark in ("DNase", "H3K4me3", "H3K27ac", "CTCF")),
+    "TF-List.All.txt",
+]
+
+
+def frozen_names(genome):
+    """List the frozen inputs of a genome.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+
+    Returns
+    -------
+    list of str
+        The inputs with sources in the config, then Biosample-Keys.txt.
+    """
+    return [*config["sources"][genome], "Biosample-Keys.txt"]
 
 
 def input_sources(w):
@@ -12,6 +34,7 @@ def input_sources(w):
 
     Sources live in another user's tree and keep changing. `ancient` stops
     their mtimes from triggering reruns. The checksum guards their content.
+    Biosample-Keys.txt derives from frozen lists and the metadata snapshot.
 
     Parameters
     ----------
@@ -21,8 +44,11 @@ def input_sources(w):
     Returns
     -------
     list of str
-        Source paths, flagged ancient.
+        Source paths, outside sources flagged ancient.
     """
+    if w.name == "Biosample-Keys.txt":
+        lists = [frozen(w.genome, name) for name in KEYED_LISTS]
+        return [*lists, ancient(config["encode_metadata"])]
     src = config["sources"][w.genome][w.name]
     return [ancient(s) for s in ([src] if isinstance(src, str) else src)]
 
@@ -31,7 +57,7 @@ def input_sources(w):
 # needs this target before any other.
 rule freeze:
     input:
-        [frozen(genome, name) for genome in GENOMES for name in config["sources"][genome]],
+        [frozen(genome, name) for genome in GENOMES for name in frozen_names(genome)],
 
 
 rule freeze_input:
@@ -102,7 +128,7 @@ rule download_encode:
     benchmark:
         f"{BENCHDIR}/download_encode/{{exp}}/{{acc}}.{{ext}}.tsv",
     params:
-        metadata=config["encode_metadata"],
+        metadata=f"{config['encode_metadata']}/file.parquet",
     wildcard_constraints:
         ext=r"bed\.gz|bigWig",
     software:

@@ -24,7 +24,6 @@ from pathlib import Path
 
 import _bed
 import _cres
-import _encode
 import polars as pl
 from _cres import above, at_most, awk_in
 
@@ -65,12 +64,11 @@ def build_parser():
         p.add_argument(f"--{mark.lower()}", help=f"{mark} z-scores. Absent: blank.")
     p.add_argument("--tss", required=True, help="TSS BED, zero-length.")
     p.add_argument("--tss-4k", required=True, help="TSS +-2 kb BED.")
-    p.add_argument("--tf-list", help="TF experiment list. Given: TF branch.")
     p.add_argument(
-        "--biosample", help="Biosample, matched to the TF list's last token."
+        "--tf-peaks",
+        nargs="+",
+        help="Peaks of the biosample's TF data. Given: TF branch.",
     )
-    p.add_argument("--encode-root", help="Local ENCODE mirror.")
-    p.add_argument("--download-dir", help="Downloaded ENCODE files.")
     p.add_argument("--autosql", required=True, help="autoSql of the bigBed fields.")
     p.add_argument("--chrom-sizes", required=True, help="Chromosome sizes.")
     p.add_argument("-o", "--output", required=True, help="BED.gz to write and index.")
@@ -285,36 +283,20 @@ def summit_intervals(peaks):
     return peaks.select(chrom="c1", start=summit, end=summit + 1)
 
 
-def tf_summits(args):
-    """Read the summits of the biosample's TF peaks.
+def tf_summits(paths):
+    """Read the summits of TF peak files.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        Parsed flags with tf_list, biosample, encode_root and download_dir.
+    paths : list of str
+        Gzipped narrowPeak files.
 
     Returns
     -------
     polars.DataFrame
         The chrom, start and end of every summit.
     """
-    with open(args.tf_list) as f:
-        rows = [line.rstrip("\n").split("\t") for line in f]
-    parts = []
-    for row in rows:
-        if row[-1].split()[-1] != args.biosample:
-            continue
-        path = _encode.encode_path(
-            args.encode_root, args.download_dir, row[0], row[1], "bed.gz"
-        )
-        parts.append(summit_intervals(_bed.read_tsv(path, NARROWPEAK)))
-    return (
-        pl.concat(parts)
-        if parts
-        else pl.DataFrame(
-            schema={"chrom": pl.String, "start": pl.Int64, "end": pl.Int64}
-        )
-    )
+    return pl.concat(summit_intervals(_bed.read_tsv(p, NARROWPEAK)) for p in paths)
 
 
 def main(argv=None):
@@ -382,7 +364,7 @@ def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed flags. A TF list selects the TF branch.
+        Parsed flags. TF peak files select the TF branch.
     master : list of list of str
         The cCREs-Unfiltered rows.
     groups : dict of str to list of str
@@ -405,8 +387,8 @@ def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
             for r in master_rows(master, classes[label])
         ]
     ca = master_rows(master, classes["CA-only"])
-    if args.tf_list:
-        summits = tf_summits(args)
+    if args.tf_peaks:
+        summits = tf_summits(args.tf_peaks)
         ca_table = pl.DataFrame(
             ca, schema=dict.fromkeys(MASTER, pl.String), orient="row"
         )

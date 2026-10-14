@@ -43,12 +43,9 @@ rule classify_ccres:
 
 import master_cell_list as mcl
 
-# Genomes whose step 7 uses a frozen master list instead of building one.
-FROZEN_MASTER = [g for g in GENOMES if "Master-Cell-List.txt" in config["sources"][g]]
-
 
 @cache
-def _master_rows(lists, tf_list):
+def _master_rows(lists, tf_list, keys):
     """Return the master cell list rows of frozen lists, once per path set.
 
     Parameters
@@ -57,20 +54,19 @@ def _master_rows(lists, tf_list):
         DNase, H3K4me3, H3K27ac and CTCF lists.
     tf_list : str
         Cell type TF experiment list.
+    keys : str
+        Biosample-Keys.txt.
 
     Returns
     -------
     list of list of str
-        Master cell list rows.
+        Master cell list rows, each with its biosample key last.
     """
-    return mcl.master_rows(list(lists), tf_list)
+    return mcl.master_rows(list(lists), tf_list, keys)
 
 
 def master_rows(genome):
-    """Return a genome's master cell list rows.
-
-    A genome in `FROZEN_MASTER` reads its frozen list. The others build theirs
-    from the frozen mark and TF lists.
+    """Return a genome's master cell list rows, built from its frozen lists.
 
     Parameters
     ----------
@@ -80,12 +76,32 @@ def master_rows(genome):
     Returns
     -------
     list of list of str
-        Master cell list rows.
+        Master cell list rows, each with its biosample key last.
     """
-    if genome in FROZEN_MASTER:
-        return read_rows(frozen_list(genome, "Master-Cell-List.txt"))
     lists = tuple(frozen_list(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
-    return _master_rows(lists, frozen_list(genome, "TF-List.Cell-Type.txt"))
+    return _master_rows(
+        lists,
+        frozen_list(genome, "TF-List.Cell-Type.txt"),
+        frozen_list(genome, "Biosample-Keys.txt"),
+    )
+
+
+@cache
+def tf_experiments(genome):
+    """Group a genome's cell type TF experiments by biosample key.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+
+    Returns
+    -------
+    dict of str to list of tuple of (str, str)
+        (experiment, peak file) per key, tagging modifications aside.
+    """
+    keys = mcl.read_keys(frozen_list(genome, "Biosample-Keys.txt"))
+    return mcl.tf_experiments(frozen_list(genome, "TF-List.Cell-Type.txt"), keys)
 
 
 def cell_type_files(genome):
@@ -119,8 +135,8 @@ def cell_type_inputs(w):
     Returns
     -------
     dict of str to str or list of str
-        Signal tables per present mark and, for the TF branch, the TF list and
-        the biosample's peak files.
+        Signal tables per present mark and, for the TF branch, the peak files
+        of the biosample's TF experiments.
     """
     (row,) = [r for r in master_rows(w.genome) if mcl.output_name(r) == w.cts]
     inputs = {
@@ -128,13 +144,10 @@ def cell_type_inputs(w):
         for i, mark in enumerate(mcl.MARKS)
         if row[2 * i] != mcl.MISSING
     }
-    if row[0] != mcl.MISSING and row[-1] == "yes":
-        tf_list = frozen_list(w.genome, "TF-List.Cell-Type.txt")
-        inputs["tf_list"] = tf_list
+    if row[0] != mcl.MISSING and row[10] == "yes":
         inputs["tf_peaks"] = [
-            ancient(encode_file(r[0], r[1], "bed.gz"))
-            for r in read_rows(tf_list)
-            if r[-1].split()[-1] == row[8]
+            ancient(encode_file(exp, peak, "bed.gz"))
+            for exp, peak in tf_experiments(w.genome)[row[-1]]
         ]
     return inputs
 
@@ -152,20 +165,14 @@ def cell_type_flags(w, input):
     Returns
     -------
     list of str
-        Signal flags, then the TF branch flags.
+        Signal flags, then the TF peak files of the TF branch.
     """
     flags = []
     for mark in mcl.MARKS:
         if mark.lower() in input.keys():
             flags += [f"--{mark.lower()}", input[mark.lower()]]
-    if "tf_list" in input.keys():
-        (row,) = [r for r in master_rows(w.genome) if mcl.output_name(r) == w.cts]
-        flags += [
-            "--tf-list", input.tf_list,
-            "--biosample", row[8],
-            "--encode-root", ENCODE_ROOT,
-            "--download-dir", DOWNLOAD_DIR,
-        ]
+    if "tf_peaks" in input.keys():
+        flags += ["--tf-peaks", *input.tf_peaks]
     return flags
 
 
@@ -176,10 +183,9 @@ rule master_cell_list:
             for mark in mcl.MARKS
         },
         tf_list=lambda w: frozen(w.genome, "TF-List.Cell-Type.txt"),
+        biosample_keys=lambda w: frozen(w.genome, "Biosample-Keys.txt"),
     output:
         f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
-    wildcard_constraints:
-        genome="|".join(g for g in GENOMES if g not in FROZEN_MASTER),
     log:
         f"{LOGDIR}/master_cell_list/{{genome}}.txt",
     benchmark:
@@ -196,30 +202,8 @@ rule master_cell_list:
             --h3k27ac {input.h3k27ac:q} \
             --ctcf {input.ctcf:q} \
             --tf-list {input.tf_list:q} \
+            --keys {input.biosample_keys:q} \
             --output {output:q}
-
-        sync {output:q}
-        """
-
-
-rule frozen_master_cell_list:
-    input:
-        lambda w: frozen(w.genome, "Master-Cell-List.txt"),
-    output:
-        f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
-    wildcard_constraints:
-        genome="|".join(FROZEN_MASTER),
-    log:
-        f"{LOGDIR}/frozen_master_cell_list/{{genome}}.txt",
-    benchmark:
-        f"{BENCHDIR}/frozen_master_cell_list/{{genome}}.tsv",
-    software:
-        SOFTWARE_ENV
-    shell:
-        r"""
-        exec &> >(tee {log:q})
-
-        cp {input:q} {output:q}
 
         sync {output:q}
         """

@@ -59,7 +59,7 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 | 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.txt` | 4_Calculate-Signal-Zscores.sh |
 | 5 | `max_zscore` | `<g>-<mark>-maxZ.txt` | 5_Determine-Max-Zscores.sh |
 | 6 | `classify_ccres` | `<g>-cCREs-Unfiltered.bed` | 6_Classify-cCREs.sh |
-| 7 | `master_cell_list`, `frozen_master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
+| 7 | `master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/` | 7_Call-Cell-Type-Specific.sh |
 | 8 | `pls_genes` | `<g>-PLS-Gene-List.txt` | 8_Assign-PLS-Gene.sh |
 
 Step 0 sweeps 4,941 FDR thresholds. The port merges only at thresholds where some position has
@@ -79,7 +79,7 @@ class, though the paper's Fig. 1 lists it among the classifying signals.
 
 `freeze_input` copies each source in `config.yaml` to `data/inputs/<genome>/` and fails unless the
 copy matches its line in `config/inputs.b3`. Sources can change upstream, so a changed source can
-never reach a run unnoticed. Two inputs are derived:
+never reach a run unnoticed. Three inputs are derived:
 
 - `cCREs-Previous.bed`: the V1-V3 rows of `Previous-Versions/cCREs.<genome>.bed.gz`. The file now
   also holds V4, the release this port reproduces.
@@ -87,16 +87,22 @@ never reach a run unnoticed. Two inputs are derived:
   `Master-Cell-List.txt`. hg38 takes them from `TF-List.Filtered-Mod.txt` (121 biosamples). A 2025
   edit of that list matches more biosamples, which would move them to step 7's TF branch. mm10
   takes them from two May 2022 files that hold the list's columns (36 biosamples).
+- `Biosample-Keys.txt`: a key for each experiment file of the mark lists and `TF-List.All.txt`,
+  from the ENCODE metadata snapshot. It is the sorted set of the biosamples whose replicates made the
+  file. A biosample is its ontology term, donor (a mouse's strain background), treatments, age, life
+  stage, sex, differentiation time, genetic modifications, cell-cycle phase, diseases and origin.
 
-mm10's step 7 freezes the release's May 2022 `Master-Cell-List.txt`. The mm10 mark lists were
-edited in 2025 and no longer rebuild it.
+Step 7 joins experiments into master list rows on their keys. The release joined them on the
+biosample names in the lists, which spell some biosamples several ways and name some pooled sets
+after one donor. A TF experiment counts for a row whose key equals its own, tagging modifications
+aside.
 
 The frozen lists set which jobs exist, so Snakemake reads them while it builds the DAG. A fresh
 `data/inputs/` therefore needs the `freeze` target before any other run.
 
 ENCODE files resolve to `<encode_root>/<exp>/<file>.<ext>`, a local mirror. A file missing there
-downloads from ENCODE's public S3 bucket to `data/encode/`. Its key and MD5 come from a snapshot of
-the ENCODE file report (`encode_metadata` in the config). The `download` target fetches every
+downloads from ENCODE's public S3 bucket to `data/encode/`. Its key and MD5 come from the ENCODE
+metadata snapshot (`encode_metadata` in the config). The `download` target fetches every
 missing file a run reads, so the run itself needs no network.
 
 ## Running

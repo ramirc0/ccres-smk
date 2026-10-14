@@ -1,10 +1,16 @@
 """Step 7a: the master cell list, one row per biosample with its mark experiments.
 
 Port of match-biosamples.py and the TF flag of 7_Call-Cell-Type-Specific.sh.
-Biosamples come in order of first appearance across the DNase, H3K4me3,
-H3K27ac and CTCF lists. A later experiment of the same mark replaces an
-earlier one. A row whose file is NA counts as no experiment. Biosamples with
-TF data come first, flagged yes, then the rest, flagged no.
+Experiments join on their biosample key (Biosample-Keys.txt): the set of
+biosamples their file came from, compared whole. The original joined them on
+the biosample names in the lists, which spell one biosample several ways and
+can name a pooled set after one donor. Rows come in order of first appearance
+across the DNase, H3K4me3, H3K27ac and CTCF lists, and take the name of their
+first experiment. Of two experiments of one mark under a key, the later
+released wins, then the lower accession. A row whose file is NA counts as no
+experiment. A TF experiment counts for the row whose key equals its own,
+tagging modifications aside. Biosamples with TF data come first, flagged yes,
+then the rest, flagged no.
 """
 
 import argparse
@@ -42,6 +48,7 @@ def build_parser():
     for mark in MARKS:
         p.add_argument(f"--{mark.lower()}", required=True, help=f"{mark} list.")
     p.add_argument("--tf-list", required=True, help="Cell type TF experiment list.")
+    p.add_argument("--keys", required=True, help="Biosample-Keys.txt.")
     p.add_argument("-o", "--output", required=True, help="Master cell list to write.")
     return p
 
@@ -63,39 +70,87 @@ def read_rows(path):
         return [line.rstrip().split("\t") for line in f]
 
 
-def master_rows(mark_lists, tf_list):
-    """Return the master cell list rows.
+def read_keys(path):
+    """Read Biosample-Keys.txt.
+
+    Parameters
+    ----------
+    path : str
+        Rows of experiment, file, key, key without tagging modifications, and
+        release date.
+
+    Returns
+    -------
+    dict of tuple of (str, str) to tuple of (str, str, str)
+        The keys and release date of each (experiment, file).
+    """
+    return {(r[0], r[1]): (r[2], r[3], r[4]) for r in read_rows(path)}
+
+
+def tf_experiments(tf_list, keys):
+    """Group the TF list's experiments by biosample key.
+
+    Parameters
+    ----------
+    tf_list : str
+        TF experiment list. Columns 1-2 are experiment and peak file.
+    keys : dict
+        Output of `read_keys`.
+
+    Returns
+    -------
+    dict of str to list of tuple of (str, str)
+        (experiment, peak file) per key, tagging modifications aside, in list
+        order.
+    """
+    grouped = {}
+    for exp, peak, *_ in read_rows(tf_list):
+        grouped.setdefault(keys[(exp, peak)][1], []).append((exp, peak))
+    return grouped
+
+
+def master_rows(mark_lists, tf_list, keys):
+    """Return the master cell list rows, each with its biosample key.
 
     Parameters
     ----------
     mark_lists : list of str
         DNase, H3K4me3, H3K27ac and CTCF lists, in that order. Columns:
-        experiment, file, biosample.
+        experiment, file, biosample name.
     tf_list : str
-        TF experiment list. The last column is the biosample.
+        TF experiment list.
+    keys : str
+        Biosample-Keys.txt.
 
     Returns
     -------
     list of list of str
-        Experiment and file of each mark (--- when absent), biosample, group
-        and TF flag.
+        Experiment and file of each mark (--- when absent), biosample name,
+        group, TF flag, then the key, which the written list leaves out.
     """
-    flags, files = {}, {}
+    key_of = read_keys(keys)
+    candidates, names = {}, {}
     for mode, path in enumerate(mark_lists):
         for exp, acc, cell, *_ in read_rows(path):
             if acc == "NA":
                 continue
-            if cell not in flags:
-                flags[cell] = ["N"] * len(MARKS)
-                files[cell] = [MISSING] * (2 * len(MARKS))
-            flags[cell][mode] = "Y"
-            files[cell][2 * mode : 2 * mode + 2] = [exp, acc]
-    with open(tf_list) as f:
-        with_tf = {line.rstrip("\n").split("\t")[-1] for line in f}
-    rows = [[*files[c], c, GROUPS["".join(flags[c])]] for c in flags]
-    return [r + ["yes"] for r in rows if r[8] in with_tf] + [
-        r + ["no"] for r in rows if r[8] not in with_tf
-    ]
+            key, _, released = key_of[(exp, acc)]
+            names.setdefault(key, cell)
+            marks = candidates.setdefault(key, [[] for _ in MARKS])
+            marks[mode].append((exp, acc, released))
+    with_tf = tf_experiments(tf_list, key_of)
+    rows = []
+    for key, marks in candidates.items():
+        files = []
+        for mark, found in zip(MARKS, marks):
+            # max keeps the first of equal dates, so the lowest accession.
+            best = max(sorted(found), key=lambda c: c[2]) if found else None
+            if len(found) > 1:
+                print(f"{mark} of {names[key]}: {best[0]} of {[c[0] for c in found]}")
+            files += best[:2] if best else [MISSING, MISSING]
+        group = GROUPS["".join("N" if f == MISSING else "Y" for f in files[::2])]
+        rows.append([*files, names[key], group, "yes" if key in with_tf else "no", key])
+    return [r for r in rows if r[10] == "yes"] + [r for r in rows if r[10] == "no"]
 
 
 def output_name(row):
@@ -129,7 +184,10 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     lists = [getattr(args, mark.lower()) for mark in MARKS]
     with open(args.output, "w") as f:
-        f.writelines("\t".join(r) + "\n" for r in master_rows(lists, args.tf_list))
+        f.writelines(
+            "\t".join(r[:-1]) + "\n"
+            for r in master_rows(lists, args.tf_list, args.keys)
+        )
 
 
 if __name__ == "__main__":
