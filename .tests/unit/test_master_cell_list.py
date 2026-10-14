@@ -57,7 +57,7 @@ def test_rows_join_on_biosample_key(tmp_path):
         "H3K4me3": [["ENCSR000AAB", "ENCFF000AAB", "cell_a_spelled_otherwise"]],
         "H3K27ac": [["ENCSR000AAC", "ENCFF000AAC", "cell_a"]],
     }
-    tf_rows = [["ENCSR000AAD", "ENCFF000AAD", "Homo sapiens cell a"]]
+    tf_rows = [["ENCSR000AAD", "ENCFF000AAD", "x", "CTCF", "0.01", "lab", "line", "NA"]]
     paths, tf = write_lists(tmp_path, lists, tf_rows)
     keys = write_keys(
         tmp_path,
@@ -75,6 +75,37 @@ def test_rows_join_on_biosample_key(tmp_path):
         ["ENCSR000AAA", "ENCFF000AAA", "ENCSR000AAB", "ENCFF000AAB", *missing * 2]
         + ["cell_a", "Group4", "no", "k1"],
     ]
+
+
+def test_tf_flag_follows_biosample_key(tmp_path):
+    """Flag a row when a TF experiment that passes step 3 shares its key."""
+    lists = {
+        "DNase": [
+            ["ENCSR000AAA", "ENCFF000AAA", "cell_a"],
+            ["ENCSR000AAB", "ENCFF000AAB", "cell_b"],
+            ["ENCSR000AAC", "ENCFF000AAC", "cell_c"],
+        ]
+    }
+    tf_rows = [
+        [f"ENCSR000TF{i}", f"ENCFF000TF{i}", "x", "CTCF", frip, "lab", "line", "NA"]
+        for i, frip in enumerate(["0.01", "0.001", "NA"])
+    ]
+    paths, tf = write_lists(tmp_path, lists, tf_rows)
+    keys = write_keys(
+        tmp_path,
+        [
+            *(
+                (f"ENCSR000AA{c}", f"ENCFF000AA{c}", f"k{c}", f"k{c}", "2020-01-01")
+                for c in "ABC"
+            ),
+            *(
+                (f"ENCSR000TF{i}", f"ENCFF000TF{i}", "t", f"k{c}", "2020-01-01")
+                for i, c in enumerate("ABC")
+            ),
+        ],
+    )
+    flags = {r[8]: r[10] for r in mcl.master_rows(paths, tf, keys)}
+    assert flags == {"cell_a": "yes", "cell_b": "no", "cell_c": "no"}
 
 
 def test_one_mark_twice_under_a_key(tmp_path):

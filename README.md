@@ -79,14 +79,10 @@ class, though the paper's Fig. 1 lists it among the classifying signals.
 
 `freeze_input` copies each source in `config.yaml` to `data/inputs/<genome>/` and fails unless the
 copy matches its line in `config/inputs.b3`. Sources can change upstream, so a changed source can
-never reach a run unnoticed. Three inputs are derived:
+never reach a run unnoticed. Two inputs are derived:
 
 - `cCREs-Previous.bed`: the V1-V3 rows of `Previous-Versions/cCREs.<genome>.bed.gz`. The file now
   also holds V4, the release this port reproduces.
-- `TF-List.Cell-Type.txt`: the TF experiments of the biosamples the release flagged TF=yes in
-  `Master-Cell-List.txt`. hg38 takes them from `TF-List.Filtered-Mod.txt` (121 biosamples). A 2025
-  edit of that list matches more biosamples, which would move them to step 7's TF branch. mm10
-  takes them from two May 2022 files that hold the list's columns (36 biosamples).
 - `Biosample-Keys.txt`: a key for each experiment file of the mark lists and `TF-List.All.txt`,
   from the ENCODE metadata snapshot. It is the sorted set of the biosamples whose replicates made the
   file. A biosample is its ontology term, donor (a mouse's strain background), treatments, age, life
@@ -94,8 +90,9 @@ never reach a run unnoticed. Three inputs are derived:
 
 Step 7 joins experiments into master list rows on their keys. The release joined them on the
 biosample names in the lists, which spell some biosamples several ways and name some pooled sets
-after one donor. A TF experiment counts for a row whose key equals its own, tagging modifications
-aside.
+after one donor. A row is flagged TF=yes, and takes step 7's TF branch when it has DNase, if a TF
+experiment that passes step 3's filter has its key, tagging modifications aside. The release
+flagged the biosamples of a curated list (121 in hg38).
 
 The frozen lists set which jobs exist, so Snakemake reads them while it builds the DAG. A fresh
 `data/inputs/` therefore needs the `freeze` target before any other run.

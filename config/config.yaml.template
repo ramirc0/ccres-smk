@@ -34,9 +34,6 @@ sources:
     CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/CTCF-List.txt
     ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/ATAC-List.txt
     TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-TF/hg38-TF-List.All.txt
-    TF-List.Cell-Type.txt:
-      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-TF/hg38-TF-List.Filtered-Mod.txt
-      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/Cell-Type-Specific/Master-Cell-List.txt
     cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-hg38/hg38-cDHS/Altius-cDHSs.DAC-hg38.bed
     rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.hg38.bed.gz
     cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.hg38.bed.gz
@@ -52,12 +49,6 @@ sources:
     CTCF-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/CTCF-List.txt
     ATAC-List.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/ATAC-List.txt
     TF-List.All.txt: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/mm10-TF-List.All.txt
-    # x and xx (May 31, 2022) are the TF list's columns 1-9 and 10. The May 2022
-    # master list names the biosamples the release flagged TF=yes.
-    TF-List.Cell-Type.txt:
-      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/x
-      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-TF/xx
-      - /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/Cell-Type-Specific/Old/Master-Cell-List.txt
     cDHSs.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry/V7-mm10/mm10-cDHS/Altius-cDHSs.DAC-mm10.bed
     rDHS-Previous.bed.gz: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/rDHS.mm10.bed.gz
     cCREs-Previous.bed: /data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/Previous-Versions/cCREs.mm10.bed.gz

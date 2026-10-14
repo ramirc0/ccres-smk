@@ -3,7 +3,6 @@
 # Derived inputs filter their sources. Every other input is a plain copy.
 DERIVED = {
     "cCREs-Previous.bed": "previous-ccres",
-    "TF-List.Cell-Type.txt": "cell-type-tf",
     "Biosample-Keys.txt": "biosample-keys",
 }
 # Lists whose experiments Biosample-Keys.txt keys from the metadata snapshot.
@@ -106,11 +105,8 @@ def encode_files(genome):
         Path of each file, in the mirror or the download directory.
     """
     marks = [r for m in MARKS for r in read_rows(frozen_list(genome, f"{m}-List.txt"))]
-    peaks = tf_rows(genome)
-    if "TF-List.Cell-Type.txt" in config["sources"][genome]:
-        peaks += read_rows(frozen_list(genome, "TF-List.Cell-Type.txt"))
     hotspots = read_rows(frozen_list(genome, "Hotspot-List.txt"))
-    return [encode_file(*f) for f in encode_inputs(hotspots, marks, peaks)]
+    return [encode_file(*f) for f in encode_inputs(hotspots, marks, tf_rows(genome))]
 
 
 # Fetches the ENCODE files the mirror lacks, so a run needs no network.

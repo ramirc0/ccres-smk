@@ -8,12 +8,15 @@ can name a pooled set after one donor. Rows come in order of first appearance
 across the DNase, H3K4me3, H3K27ac and CTCF lists, and take the name of their
 first experiment. Of two experiments of one mark under a key, the later
 released wins, then the lower accession. A row whose file is NA counts as no
-experiment. A TF experiment counts for the row whose key equals its own,
-tagging modifications aside. Biosamples with TF data come first, flagged yes,
-then the rest, flagged no.
+experiment. A TF experiment that passes step 3's filter counts for the row
+whose key equals its own, tagging modifications aside. Biosamples with TF data
+come first, flagged yes, then the rest, flagged no. The release flagged only
+the biosamples of a curated TF list.
 """
 
 import argparse
+
+import tf_list as tfl
 
 MARKS = ("DNase", "H3K4me3", "H3K27ac", "CTCF")
 GROUPS = {
@@ -47,7 +50,7 @@ def build_parser():
     p = argparse.ArgumentParser(description="Build the master cell list.")
     for mark in MARKS:
         p.add_argument(f"--{mark.lower()}", required=True, help=f"{mark} list.")
-    p.add_argument("--tf-list", required=True, help="Cell type TF experiment list.")
+    p.add_argument("--tf-list", required=True, help="TF-List.All.txt.")
     p.add_argument("--keys", required=True, help="Biosample-Keys.txt.")
     p.add_argument("-o", "--output", required=True, help="Master cell list to write.")
     return p
@@ -88,12 +91,12 @@ def read_keys(path):
 
 
 def tf_experiments(tf_list, keys):
-    """Group the TF list's experiments by biosample key.
+    """Group the TF experiments that pass step 3's filter by biosample key.
 
     Parameters
     ----------
     tf_list : str
-        TF experiment list. Columns 1-2 are experiment and peak file.
+        TF-List.All.txt.
     keys : dict
         Output of `read_keys`.
 
@@ -104,8 +107,10 @@ def tf_experiments(tf_list, keys):
         order.
     """
     grouped = {}
-    for exp, peak, *_ in read_rows(tf_list):
-        grouped.setdefault(keys[(exp, peak)][1], []).append((exp, peak))
+    for fields in read_rows(tf_list):
+        if tfl.passes(fields):
+            exp, peak = fields[:2]
+            grouped.setdefault(keys[(exp, peak)][1], []).append((exp, peak))
     return grouped
 
 
@@ -118,7 +123,7 @@ def master_rows(mark_lists, tf_list, keys):
         DNase, H3K4me3, H3K27ac and CTCF lists, in that order. Columns:
         experiment, file, biosample name.
     tf_list : str
-        TF experiment list.
+        TF-List.All.txt.
     keys : str
         Biosample-Keys.txt.
 

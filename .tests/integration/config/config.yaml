@@ -41,9 +41,6 @@ sources:
     chromInfo.txt: resources/hg38/chromInfo.txt
     cres.as: resources/hg38/cres.as
     cCREs-Previous.bed: resources/hg38/cCREs.bed.gz
-    TF-List.Cell-Type.txt:
-      - resources/hg38/TF-Filtered-Mod.txt
-      - resources/hg38/Master-Cell-List.txt
   mm10:
     Hotspot-List.txt: resources/mm10/Hotspot-List.txt
     DNase-List.txt: resources/mm10/DNase-List.txt
@@ -59,7 +56,3 @@ sources:
     chromInfo.txt: resources/mm10/chromInfo.txt
     cres.as: resources/mm10/cres.as
     cCREs-Previous.bed: resources/mm10/cCREs.bed.gz
-    TF-List.Cell-Type.txt:
-      - resources/mm10/TF-Filtered.txt
-      - resources/mm10/TF-Biosamples.txt
-      - resources/mm10/Master-Cell-List.txt

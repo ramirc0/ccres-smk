@@ -207,16 +207,6 @@ def build(genome):
     for r in chosen:
         encode_copy(r[0], r[1], "bed.gz")
     write(res / "TF-List.All.txt", chosen + [r for r in tf_all if r[1] == "NA"][:1])
-    tf_rows = [[*r, "ENCDO000TOY", "toy_tf"] for r in chosen[:2]]
-    if genome == "mm10":
-        # As in the real config, mm10's TF list comes as two column files.
-        tf_files = ["TF-Filtered.txt", "TF-Biosamples.txt"]
-        write(res / tf_files[0], [r[:-1] for r in tf_rows])
-        write(res / tf_files[1], [r[-1:] for r in tf_rows])
-    else:
-        tf_files = ["TF-Filtered-Mod.txt"]
-        write(res / tf_files[0], tf_rows)
-    write(res / "Master-Cell-List.txt", [["---"] * 8 + ["toy_tf", "Group1", "yes"]])
     named = [row for table in marks.values() for row in table]
     named += [
         (r[0], r[1], "toy_tf" if r in chosen[:2] else "toy_tf_other") for r in chosen
@@ -254,9 +244,6 @@ def build(genome):
         )
     }
     sources["cCREs-Previous.bed"] = f"{rel}/cCREs.bed.gz"
-    sources["TF-List.Cell-Type.txt"] = [
-        f"{rel}/{name}" for name in (*tf_files, "Master-Cell-List.txt")
-    ]
     return sources, named
 
 
@@ -406,8 +393,6 @@ def _digest(src, name, scratch):
     scratch.parent.mkdir(parents=True, exist_ok=True)
     if name == "cCREs-Previous.bed":
         freeze_input.previous_ccres(HERE / src, scratch)
-    elif name == "TF-List.Cell-Type.txt":
-        freeze_input.cell_type_tf([HERE / s for s in src[:-1]], HERE / src[-1], scratch)
     elif name == "Biosample-Keys.txt":
         freeze_input.write_biosample_keys(
             [HERE / s for s in src[:-1]], HERE / src[-1], scratch

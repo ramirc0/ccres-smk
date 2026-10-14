@@ -53,7 +53,7 @@ def _master_rows(lists, tf_list, keys):
     lists : tuple of str
         DNase, H3K4me3, H3K27ac and CTCF lists.
     tf_list : str
-        Cell type TF experiment list.
+        TF-List.All.txt.
     keys : str
         Biosample-Keys.txt.
 
@@ -81,14 +81,14 @@ def master_rows(genome):
     lists = tuple(frozen_list(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
     return _master_rows(
         lists,
-        frozen_list(genome, "TF-List.Cell-Type.txt"),
+        frozen_list(genome, "TF-List.All.txt"),
         frozen_list(genome, "Biosample-Keys.txt"),
     )
 
 
 @cache
 def tf_experiments(genome):
-    """Group a genome's cell type TF experiments by biosample key.
+    """Group a genome's TF experiments that pass step 3's filter by biosample key.
 
     Parameters
     ----------
@@ -101,7 +101,7 @@ def tf_experiments(genome):
         (experiment, peak file) per key, tagging modifications aside.
     """
     keys = mcl.read_keys(frozen_list(genome, "Biosample-Keys.txt"))
-    return mcl.tf_experiments(frozen_list(genome, "TF-List.Cell-Type.txt"), keys)
+    return mcl.tf_experiments(frozen_list(genome, "TF-List.All.txt"), keys)
 
 
 def cell_type_files(genome):
@@ -182,7 +182,7 @@ rule master_cell_list:
             mark.lower(): (lambda w, mark=mark: frozen(w.genome, f"{mark}-List.txt"))
             for mark in mcl.MARKS
         },
-        tf_list=lambda w: frozen(w.genome, "TF-List.Cell-Type.txt"),
+        tf_list=lambda w: frozen(w.genome, "TF-List.All.txt"),
         biosample_keys=lambda w: frozen(w.genome, "Biosample-Keys.txt"),
     output:
         f"{OUTDIR}/{{genome}}/Cell-Type-Specific/Master-Cell-List.txt",
