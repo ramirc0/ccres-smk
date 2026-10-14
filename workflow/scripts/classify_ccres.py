@@ -16,7 +16,7 @@ import _bed
 import _cres
 import _registry
 import polars as pl
-from _cres import above, at_most, awk_in
+from _cres import above, at_most, select
 
 ANCHOR = ["chrom", "start", "end", "accession"]
 
@@ -73,25 +73,25 @@ def classify(groups, k4, k27, ctcf):
     dict of str to list of tuple
         The maxZ lines per class: PLS, pELS, dELS, CA-H3K4me3, CA-CTCF, CA.
     """
-    tss_k4 = awk_in(groups["tss"], k4)
+    tss_k4 = select(groups["tss"], k4)
     no1 = at_most(tss_k4)
-    no2 = at_most(awk_in(names(no1), k27))
+    no2 = at_most(select(names(no1), k27))
     classes = {
         "PLS": above(tss_k4),
-        "pELS": above(awk_in(names(no1), k27)),
+        "pELS": above(select(names(no1), k27)),
         "dELS": [],
         "CA-H3K4me3": [],
-        "CA-CTCF": above(awk_in(names(no2), ctcf)),
-        "CA": at_most(awk_in(names(no2), ctcf)),
+        "CA-CTCF": above(select(names(no2), ctcf)),
+        "CA": at_most(select(names(no2), ctcf)),
     }
     for group, enhancer in (("prox", "pELS"), ("distal", "dELS")):
-        group_k27 = awk_in(groups[group], k27)
+        group_k27 = select(groups[group], k27)
         classes[enhancer] += above(group_k27)
         no1 = at_most(group_k27)
-        classes["CA-H3K4me3"] += above(awk_in(names(no1), k4))
-        no2 = at_most(awk_in(names(no1), k4))
-        classes["CA-CTCF"] += above(awk_in(names(no2), ctcf))
-        classes["CA"] += at_most(awk_in(names(no2), ctcf))
+        classes["CA-H3K4me3"] += above(select(names(no1), k4))
+        no2 = at_most(select(names(no1), k4))
+        classes["CA-CTCF"] += above(select(names(no2), ctcf))
+        classes["CA"] += at_most(select(names(no2), ctcf))
     return classes
 
 
@@ -120,7 +120,7 @@ def main(argv=None):
     )
     rows = list(zip(anchors["accession"].to_list(), range(anchors.height)))
 
-    bed = [i for _, i in awk_in(names(above(_cres.read_signal(args.dnase))), rows)]
+    bed = [i for _, i in select(names(above(_cres.read_signal(args.dnase))), rows)]
     groups = _cres.tss_groups(
         [rows[i][0] for i in bed],
         tss,
@@ -137,14 +137,14 @@ def main(argv=None):
 
     labelled = []
     for cls in ("PLS", "pELS", "dELS", "CA-H3K4me3", "CA-CTCF"):
-        labelled += [(i, cls) for _, i in awk_in(names(classes[cls]), rows)]
+        labelled += [(i, cls) for _, i in select(names(classes[cls]), rows)]
     on_tf = _bed.overlaps_any(anchor_iv, tf_iv)
-    ca = [i for _, i in awk_in(names(classes["CA"]), rows)]
+    ca = [i for _, i in select(names(classes["CA"]), rows)]
     labelled += [(i, "CA-TF") for i in ca if on_tf[i]]
     labelled += [(i, "CA") for i in ca if not on_tf[i]]
     tf_rows = [rows[i] for i in range(anchors.height) if on_tf[i]]
     labelled_names = [rows[i][0] for i, _ in labelled]
-    labelled += [(i, "TF") for _, i in awk_in(labelled_names, tf_rows, negate=True)]
+    labelled += [(i, "TF") for _, i in select(labelled_names, tf_rows, negate=True)]
 
     index, label = zip(*labelled)
     ccres = anchors[list(index)].with_columns(label=pl.Series(label, dtype=pl.String))

@@ -10,40 +10,38 @@ FAR = 2000
 TSS = ["chrom", "start", "end", "transcript", "score", "strand", "gene"]
 
 
-def awk_in(first, second, negate=False, field=0):
-    """Select like `awk 'FNR==NR {x[$k];next} (key in x)' first second`.
+def select(keys, items, negate=False, field=0):
+    """Keep the items whose key is in `keys`, or with `negate` not in it.
 
-    awk reads an empty first file as no file, so it takes the second file as
-    the first and prints nothing. That quirk is kept: it decides some classes
-    when a signal file is empty.
+    Port of `awk 'FNR==NR {x[$k];next} (key in x)' first second`. awk read an
+    empty first file as no file and printed nothing, even under `!(key in x)`.
+    Here no keys select every item under `negate`.
 
     Parameters
     ----------
-    first : list of str
-        Keys of the first file, in file order.
-    second : list
+    keys : list of str
+        Keys of the first file.
+    items : list
         Items of the second file: all keys, or all sequences such as tuples
         and rows that hold the key at `field`.
     negate : bool
-        Select the items whose key is not in `first`, as `!(key in x)`.
+        Select the items whose key is not in `keys`.
     field : int
         Position of the key in a sequence item.
 
     Returns
     -------
     list
-        Selected items of `second`, in order.
+        Selected items, in order.
     """
-    if not first:
-        return []
-    keys = set(first)
-    if second and isinstance(second[0], str):
-        return [s for s in second if (s in keys) != negate]
-    return [s for s in second if (s[field] in keys) != negate]
+    keys = set(keys)
+    if items and isinstance(items[0], str):
+        return [s for s in items if (s in keys) != negate]
+    return [s for s in items if (s[field] in keys) != negate]
 
 
 def above(lines):
-    """Keep signal lines whose value passes awk's `$2 > 1.64`.
+    """Keep the signal lines whose value exceeds 1.64.
 
     Parameters
     ----------
@@ -53,14 +51,13 @@ def above(lines):
     Returns
     -------
     list of tuple of (str, str)
-        Lines above 1.64. A non-numeric value compares as text with "1.64",
-        so the placeholder line ("blank", "blank") passes.
+        Lines above 1.64.
     """
-    return [line for line in lines if _awk_compare(line[1]) > 0]
+    return [line for line in lines if float(line[1]) > HIGH]
 
 
 def at_most(lines):
-    """Keep signal lines whose value passes awk's `$2 <= 1.64`.
+    """Keep the signal lines whose value is at most 1.64.
 
     Parameters
     ----------
@@ -72,28 +69,7 @@ def at_most(lines):
     list of tuple of (str, str)
         Lines at or below 1.64.
     """
-    return [line for line in lines if _awk_compare(line[1]) <= 0]
-
-
-def _awk_compare(text):
-    """Compare a field with 1.64 as awk does.
-
-    Parameters
-    ----------
-    text : str
-        Field text.
-
-    Returns
-    -------
-    int
-        -1, 0 or 1. A field that does not look numeric compares as text with
-        the constant printed by CONVFMT, "1.64".
-    """
-    try:
-        a, b = float(text), HIGH
-    except ValueError:
-        a, b = text, f"{HIGH:.6g}"
-    return (a > b) - (a < b)
+    return [line for line in lines if float(line[1]) <= HIGH]
 
 
 def read_signal(path):
@@ -102,16 +78,15 @@ def read_signal(path):
     Parameters
     ----------
     path : str or None
-        Table path, or None for the placeholder blank.txt, whose single line
-        is "blank blank".
+        Table path, or None for a mark the biosample lacks.
 
     Returns
     -------
     list of tuple of (str, str)
-        Name and value text of each line.
+        Name and value text of each line, none without a table.
     """
     if path is None:
-        return [("blank", "blank")]
+        return []
     with open(path) as f:
         return [tuple(line.split("\t")[:2]) for line in f]
 
@@ -128,7 +103,7 @@ def tss_groups(names, tss, tss_iv, window_iv, region_iv):
     Parameters
     ----------
     names : list of str
-        Name of each region, in file order. The key of the awk joins.
+        Name of each region, in file order. The key of the selections.
     tss : polars.DataFrame
         TSS table.
     tss_iv, window_iv, region_iv : tuple of numpy.ndarray
@@ -161,7 +136,7 @@ def tss_groups(names, tss, tss_iv, window_iv, region_iv):
     far = [n for n, d in zip(keyed, distance) if d < -FAR or d > FAR]
 
     return {
-        "tss": tss_names + awk_in(near, prox_names),
-        "prox": awk_in(near + far, prox_names, negate=True),
-        "distal": distal_names + awk_in(far, prox_names),
+        "tss": tss_names + select(near, prox_names),
+        "prox": select(near + far, prox_names, negate=True),
+        "distal": distal_names + select(far, prox_names),
     }

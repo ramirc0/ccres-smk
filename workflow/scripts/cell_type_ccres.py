@@ -2,9 +2,9 @@
 
 Port of Toolkit/Split-cCREs.{TF,DNase,No-DNase}.sh. The branch follows the
 master cell list row: TF when the biosample has DNase and TF data, DNase when
-it has DNase only, No-DNase without DNase. A mark the biosample lacks reads as
-the placeholder blank.txt. Every cCRE of the release appears once per class it
-gets, then rows are sorted with `sort -k1,1 -k2,2n` and labelled by data
+it has DNase only, No-DNase without DNase. A mark the biosample lacks has no
+lines. The scripts read it from the placeholder blank.txt. Every cCRE of the
+release appears once per class it gets, then rows are sorted with `sort -k1,1 -k2,2n` and labelled by data
 completeness. The result is bgzipped, tabix-indexed and written as a bigBed.
 
 DNase and TF: cCREs with DNase z > 1.64 in the biosample split into TSS,
@@ -25,7 +25,7 @@ from pathlib import Path
 import _bed
 import _cres
 import polars as pl
-from _cres import above, at_most, awk_in
+from _cres import above, at_most, select
 
 MASTER = ["chrom", "start", "end", "rdhs", "ccre", "class"]
 NARROWPEAK = [f"c{i}" for i in range(1, 11)]
@@ -61,7 +61,7 @@ def build_parser():
     p.add_argument("--master", required=True, help="cCREs-Unfiltered BED.")
     p.add_argument("--dnase", help="DNase z-score table. Absent: No-DNase branch.")
     for mark in ("H3K4me3", "H3K27ac", "CTCF"):
-        p.add_argument(f"--{mark.lower()}", help=f"{mark} z-scores. Absent: blank.")
+        p.add_argument(f"--{mark.lower()}", help=f"{mark} z-scores. Absent: none.")
     p.add_argument("--tss", required=True, help="TSS BED, zero-length.")
     p.add_argument("--tss-4k", required=True, help="TSS +-2 kb BED.")
     p.add_argument(
@@ -100,7 +100,7 @@ def dnase_classes(groups, k4, k27, ctcf, dnase_high):
     groups : dict of str to list of str
         The rDHS accessions of the tss, prox and distal groups.
     k4, k27, ctcf : list of tuple of (str, str)
-        Signal lines of the biosample, or the blank placeholder line.
+        Signal lines of the biosample, none for a mark it lacks.
     dnase_high : list of tuple of (str, str)
         DNase lines above 1.64.
 
@@ -115,23 +115,22 @@ def dnase_classes(groups, k4, k27, ctcf, dnase_high):
         "k27": names(above(k27)),
         "ctcf": names(above(ctcf)),
     }
-    classes = {"PLS": awk_in(high["k4"], groups["tss"])}
-    no1 = awk_in(high["k4"], groups["tss"], negate=True)
-    classes["pELS"] = awk_in(high["k27"], no1)
-    no2 = awk_in(high["k27"], no1, negate=True)
-    classes["CA-CTCF"] = awk_in(high["ctcf"], no2)
+    classes = {"PLS": select(high["k4"], groups["tss"])}
+    no1 = select(high["k4"], groups["tss"], negate=True)
+    classes["pELS"] = select(high["k27"], no1)
+    no2 = select(high["k27"], no1, negate=True)
+    classes["CA-CTCF"] = select(high["ctcf"], no2)
     classes["dELS"], classes["CA-H3K4me3"] = [], []
     for group, enhancer in (("prox", "pELS"), ("distal", "dELS")):
-        classes[enhancer] += awk_in(high["k27"], groups[group])
-        no1 = awk_in(high["k27"], groups[group], negate=True)
-        classes["CA-H3K4me3"] += awk_in(high["k4"], no1)
-        no2 = awk_in(high["k4"], no1, negate=True)
-        classes["CA-CTCF"] += awk_in(high["ctcf"], no2)
+        classes[enhancer] += select(high["k27"], groups[group])
+        no1 = select(high["k27"], groups[group], negate=True)
+        classes["CA-H3K4me3"] += select(high["k4"], no1)
+        no2 = select(high["k4"], no1, negate=True)
+        classes["CA-CTCF"] += select(high["ctcf"], no2)
     found = [
         n for c in ("PLS", "pELS", "dELS", "CA-H3K4me3", "CA-CTCF") for n in classes[c]
     ]
-    # An empty all.txt would trip awk_in, so the script wrote "done" into it.
-    classes["CA-only"] = awk_in(found or ["done"], names(dnase_high), negate=True)
+    classes["CA-only"] = select(found, names(dnase_high), negate=True)
     return classes
 
 
@@ -146,28 +145,28 @@ def no_dnase_classes(groups, k4, k27, ctcf):
     groups : dict of str to list of str
         The rDHS accessions of the tss, prox and distal groups.
     k4, k27, ctcf : list of tuple of (str, str)
-        Signal lines of the biosample, or the blank placeholder line.
+        Signal lines of the biosample, none for a mark it lacks.
 
     Returns
     -------
     dict of str to list of str
         The rDHS accessions per color: red, orange, pink and blue.
     """
-    tss_k4 = awk_in(groups["tss"], k4)
+    tss_k4 = select(groups["tss"], k4)
     color = {"red": names(above(tss_k4)), "orange": [], "pink": [], "blue": []}
     no1 = names(at_most(tss_k4)) or groups["tss"]
-    tss_k27 = awk_in(no1, k27)
+    tss_k27 = select(no1, k27)
     color["orange"] += names(above(tss_k27))
     no2 = names(at_most(tss_k27)) or no1
-    color["blue"] += names(above(awk_in(no2, ctcf)))
+    color["blue"] += names(above(select(no2, ctcf)))
     for group in ("prox", "distal"):
-        group_k27 = awk_in(groups[group], k27)
+        group_k27 = select(groups[group], k27)
         color["orange"] += names(above(group_k27))
         no1 = names(at_most(group_k27)) or groups[group]
-        no1_k4 = awk_in(no1, k4)
+        no1_k4 = select(no1, k4)
         color["pink"] += names(above(no1_k4))
         no2 = names(at_most(no1_k4)) or no1
-        color["blue"] += names(above(awk_in(no2, ctcf)))
+        color["blue"] += names(above(select(no2, ctcf)))
     return color
 
 
@@ -179,14 +178,14 @@ def master_rows(master, accessions):
     master : list of list of str
         The fields of the cCREs-Unfiltered rows.
     accessions : list of str
-        The rDHS accessions, the first file of the awk join.
+        The rDHS accessions to keep.
 
     Returns
     -------
     list of list of str
         Selected rows.
     """
-    return awk_in(accessions, master, field=3)
+    return select(accessions, master, field=3)
 
 
 def class_line(row, color, label):
@@ -370,7 +369,7 @@ def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
     groups : dict of str to list of str
         The rDHS accessions of the tss, prox and distal groups.
     k4, k27, ctcf : list of tuple of (str, str)
-        Signal lines of the biosample, or the blank placeholder line.
+        Signal lines of the biosample, none for a mark it lacks.
     dnase_high : list of tuple of (str, str)
         DNase lines above 1.64.
 
@@ -408,7 +407,7 @@ def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):
     lines += [class_line(r, DNASE_COLORS["CA-only"], "CA-only") for r in ca]
     lines = [drop_first(line) for line in lines]
     labelled = [line.split("\t")[3] for line in lines]
-    low = awk_in(labelled, master, negate=True, field=4)
+    low = select(labelled, master, negate=True, field=4)
     return lines + [
         "\t".join(
             [r[0], r[1], r[2], r[4], "0", ".", r[1], r[2], "225,225,225", "Low-DNase"]
@@ -427,9 +426,9 @@ def no_dnase_lines(master, groups, k4, k27, ctcf, blank):
     groups : dict of str to list of str
         The rDHS accessions of the tss, prox and distal groups.
     k4, k27, ctcf : list of tuple of (str, str)
-        Signal lines of the biosample, or the blank placeholder line.
+        Signal lines of the biosample, none for a mark it lacks.
     blank : list of bool
-        Whether H3K4me3, H3K27ac and CTCF are the blank placeholder.
+        Whether the biosample lacks H3K4me3, H3K27ac and CTCF.
 
     Returns
     -------
@@ -448,14 +447,14 @@ def no_dnase_lines(master, groups, k4, k27, ctcf, blank):
     ):
         if not is_blank:
             first = [line.split("\t")[0] for line in lines]
-            high = names(above(awk_in(first, signal)))
-            marked = [line + suffix for _, line in awk_in(high, _keyed(lines))]
-            rest = [line for _, line in awk_in(high, _keyed(lines), negate=True)]
+            high = names(above(select(first, signal)))
+            marked = [line + suffix for _, line in select(high, _keyed(lines))]
+            rest = [line for _, line in select(high, _keyed(lines), negate=True)]
             lines = marked + rest
         lines = sorted_lines(lines, 0)
     lines = [drop_first(line.removesuffix(",").replace("#", "")) for line in lines]
     labelled = [line.split("\t")[3] for line in lines]
-    unclassified = awk_in(labelled, master, negate=True, field=4)
+    unclassified = select(labelled, master, negate=True, field=4)
     return lines + [
         "\t".join(
             [
