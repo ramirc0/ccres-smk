@@ -342,6 +342,7 @@ def main(argv=None):
         with open(args.output, "wb") as out:
             subprocess.run(["bgzip", "-c", bed_path], stdout=out, check=True)
     subprocess.run(["tabix", "-f", "-p", "bed", args.output], check=True)
+    _bed.sync(args.output, f"{args.output}.tbi")
 
 
 def dnase_lines(args, master, groups, k4, k27, ctcf, dnase_high):

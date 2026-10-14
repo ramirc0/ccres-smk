@@ -278,6 +278,17 @@ def test_read_tsv_roundtrip(tmp_path):
     assert _bed.read_tsv(empty, ["c", "s"]).shape == (0, 2)
 
 
+def test_sync(tmp_path):
+    """Flushing keeps every byte, and a missing file raises."""
+    paths = [tmp_path / "a", tmp_path / "b"]
+    for i, path in enumerate(paths):
+        path.write_text(f"chr1\t{i}\n")
+    _bed.sync(*paths)
+    assert [p.read_text() for p in paths] == ["chr1\t0\n", "chr1\t1\n"]
+    with pytest.raises(FileNotFoundError):
+        _bed.sync(tmp_path / "missing")
+
+
 def number_texts(rng, n):
     """Draw number texts in the pipeline's formats, plus rounding ties.
 

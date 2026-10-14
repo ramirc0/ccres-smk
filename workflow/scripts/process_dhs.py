@@ -66,6 +66,7 @@ def main(argv=None):
     if signal.height != named.height:
         raise ValueError(f"{signal.height} averages for {named.height} DHSs.")
     _bed.write_tsv(named.with_columns(mean0=signal["mean0"]), args.output)
+    _bed.sync(args.output)
 
 
 if __name__ == "__main__":
