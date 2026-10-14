@@ -26,11 +26,11 @@ rule tf_list:
         """
 
 
-def tf_peak_files(genome):
-    """List the peak files of a genome's filtered TF experiments.
+def tf_rows(genome):
+    """Return the rows of a genome's filtered TF experiments.
 
-    The filter of `tf_list` runs here too, so the DAG knows the files before
-    `tf_list` writes its list.
+    The filter of `tf_list` runs here too, so the DAG knows the peak files
+    before `tf_list` writes its list.
 
     Parameters
     ----------
@@ -39,22 +39,20 @@ def tf_peak_files(genome):
 
     Returns
     -------
-    list of str
-        narrowPeak path per experiment, excluded experiments left out.
+    list of list of str
+        TF-List.All.txt rows that pass, excluded experiments left out.
     """
     excluded = config["genomes"][genome]["tf_excluded"]
     rows = read_rows(frozen_list(genome, "TF-List.All.txt"))
-    return [
-        encode_file(r[0], r[1], "bed.gz")
-        for r in rows
-        if tfl.passes(r) and r[0] not in excluded
-    ]
+    return [r for r in rows if tfl.passes(r) and r[0] not in excluded]
 
 
 rule tf_peaks:
     input:
         tf_list=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-List.Filtered.txt",
-        peaks=lambda w: [ancient(p) for p in tf_peak_files(w.genome)],
+        peaks=lambda w: [
+            ancient(encode_file(r[0], r[1], "bed.gz")) for r in tf_rows(w.genome)
+        ],
     output:
         bed=f"{OUTDIR}/{{genome}}/TF/tmp.bed",
         summits=f"{OUTDIR}/{{genome}}/TF/tmp.summits",

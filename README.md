@@ -20,7 +20,7 @@ workflow/
   Snakefile              includes the rules + rule all
   rules/
     common.smk           config, list readers, ENCODE path resolution, wildcards
-    inputs.smk           freeze target, freeze_input, download_encode
+    inputs.smk           freeze and download targets, freeze_input, download_encode
     dhs.smk              steps 0-2
     tf.smk               step 3
     signal.smk           anchors, steps 4-5
@@ -96,13 +96,15 @@ The frozen lists set which jobs exist, so Snakemake reads them while it builds t
 
 ENCODE files resolve to `<encode_root>/<exp>/<file>.<ext>`, a local mirror. A file missing there
 downloads from ENCODE's public S3 bucket to `data/encode/`. Its key and MD5 come from a snapshot of
-the ENCODE file report (`encode_metadata` in the config).
+the ENCODE file report (`encode_metadata` in the config). The `download` target fetches every
+missing file a run reads, so the run itself needs no network.
 
 ## Running
 
 ```bash
 cp config/config.yaml.template config/config.yaml  # then edit
 pixi run snakemake --profile profiles/slurm freeze # once, on a fresh data/inputs/
+pixi run snakemake --profile profiles/slurm download # ENCODE files the mirror lacks
 pixi run snakemake -n -p --profile profiles/local  # dry run
 pixi run snakemake --profile profiles/local        # local
 pixi run snakemake --profile profiles/slurm        # zlurm

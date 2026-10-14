@@ -7,7 +7,7 @@ from functools import cache
 from snakemake.exceptions import WorkflowError
 
 sys.path.insert(0, f"{workflow.basedir}/scripts")
-from _encode import encode_path
+from _encode import encode_inputs, encode_path
 
 
 configfile: "config/config.yaml"

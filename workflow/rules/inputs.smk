@@ -66,6 +66,33 @@ rule freeze_input:
         """
 
 
+def encode_files(genome):
+    """List the ENCODE files a genome's jobs read.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key.
+
+    Returns
+    -------
+    list of str
+        Path of each file, in the mirror or the download directory.
+    """
+    marks = [r for m in MARKS for r in read_rows(frozen_list(genome, f"{m}-List.txt"))]
+    peaks = tf_rows(genome)
+    if "TF-List.Cell-Type.txt" in config["sources"][genome]:
+        peaks += read_rows(frozen_list(genome, "TF-List.Cell-Type.txt"))
+    hotspots = read_rows(frozen_list(genome, "Hotspot-List.txt"))
+    return [encode_file(*f) for f in encode_inputs(hotspots, marks, peaks)]
+
+
+# Fetches the ENCODE files the mirror lacks, so a run needs no network.
+rule download:
+    input:
+        lambda w: [path for genome in GENOMES for path in encode_files(genome)],
+
+
 # Only for files missing from the local mirror.
 rule download_encode:
     output:
