@@ -1,20 +1,20 @@
 """Step 8: assign promoter-like cCREs (PLS) to genes.
 
-Port of 8_Assign-PLS-Gene.sh with calculate-center-distance.py (assignment).
-A PLS gets the gene of every TSS it overlaps. A PLS overlapping none but
-within a TSS +-2 kb window gets the gene of each closest TSS (all ties) whose
-start lies at most 200 bp from the PLS center. Pairs go through `sort -u`.
+Replaces 8_Assign-PLS-Gene.sh with calculate-center-distance.py (assignment).
+A PLS gets the gene of every TSS that step 6's TSS test accepts: a TSS inside
+it, bounds included as bedtools reads a zero-length TSS, or within 200 bp of
+its center, bounds included. Pairs go through `sort -u`.
 
-Step 6 calls a cCRE TSS-proximal when its center lies within 200 bp, bounds
-included. The published script tests `abs(diff) < 200`, an off-by-one that
-leaves the 93 hg38 PLS at exactly 200 bp without a gene. The release keeps
-them, and so does the port.
+The original took the TSSs a PLS overlaps. Only for a PLS that overlapped
+none did it take the closest TSS, if its start lay within 200 bp of the
+center. It missed the other TSSs near the center.
 """
 
 import argparse
 
 import _bed
 import _cres
+import numpy as np
 import polars as pl
 
 CCRE = ["chrom", "start", "end", "rdhs", "ccre", "class"]
@@ -32,7 +32,6 @@ def build_parser():
     p = argparse.ArgumentParser(description="Assign PLS cCREs to genes.")
     p.add_argument("--ccres", required=True, help="cCREs-Unfiltered BED.")
     p.add_argument("--tss", required=True, help="TSS BED, zero-length.")
-    p.add_argument("--tss-4k", required=True, help="TSS +-2 kb BED.")
     p.add_argument("-o", "--output", required=True, help="cCRE-gene pairs to write.")
     return p
 
@@ -48,29 +47,21 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     pls = _bed.read_tsv(args.ccres, CCRE).filter(pl.col("class") == "PLS")
     tss = _bed.read_tsv(args.tss, _cres.TSS)
-    window = _bed.read_tsv(args.tss_4k, _cres.TSS)
-    codes = _bed.shared_codes(pls["chrom"], tss["chrom"], window["chrom"])
-    pls_iv, tss_iv, window_iv = (
-        (c, t["start"].cast(pl.Int64).to_numpy(), t["end"].cast(pl.Int64).to_numpy())
-        for c, t in zip(codes, (pls, tss, window))
+    pls_codes, tss_codes = _bed.shared_codes(pls["chrom"], tss["chrom"])
+    start = pls["start"].cast(pl.Int64).to_numpy()
+    end = pls["end"].cast(pl.Int64).to_numpy()
+    center = (start + end) / 2
+    # The center lies in [start, end], so this window is the union of the PLS,
+    # end included, and the positions within 200 bp of the center.
+    window = (
+        pls_codes,
+        np.minimum(start, np.ceil(center - MAX_DISTANCE)).astype(np.int64),
+        np.maximum(end, np.floor(center + MAX_DISTANCE)).astype(np.int64) + 1,
     )
+    position = tss["start"].cast(pl.Int64).to_numpy()
+    ia, ib, _ = _bed.overlap_pairs(window, (tss_codes, position, position + 1))
     ccre, gene = pls["ccre"].to_list(), tss["gene"].to_list()
-
-    ia, ib, _ = _bed.overlap_pairs(pls_iv, tss_iv)
-    pairs = [f"{ccre[i]}\t{gene[j]}" for i, j in zip(ia, ib)]
-
-    on_tss = _bed.overlaps_any(pls_iv, tss_iv)
-    near = (~on_tss) & _bed.overlaps_any(pls_iv, window_iv)
-    rows = near.nonzero()[0]
-    near_iv = tuple(a[rows] for a in pls_iv)
-    ia, ib = _bed.closest_pairs(near_iv, tss_iv)
-    # The strand only sets the sign of the distance.
-    distance = abs(tss_iv[1][ib] - (near_iv[1][ia] + near_iv[2][ia]) / 2)
-    pairs += [
-        f"{ccre[rows[i]]}\t{gene[j]}"
-        for i, j, d in zip(ia, ib, distance)
-        if d <= MAX_DISTANCE
-    ]
+    pairs = [f"{ccre[i]}\t{gene[j]}" for i, j in zip(ia.tolist(), ib.tolist())]
     with open(args.output, "w") as f:
         f.writelines(f"{line}\n" for line in _bed.sort_unique(pairs))
 

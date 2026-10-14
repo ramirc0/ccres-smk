@@ -269,7 +269,6 @@ rule pls_genes:
     input:
         ccres=f"{OUTDIR}/{{genome}}/{{genome}}-cCREs-Unfiltered.bed",
         tss=lambda w: frozen(w.genome, "TSS.Basic.bed"),
-        tss_4k=lambda w: frozen(w.genome, "TSS.Basic.4K.bed"),
     output:
         f"{OUTDIR}/{{genome}}/{{genome}}-PLS-Gene-List.txt",
     log:
@@ -285,7 +284,6 @@ rule pls_genes:
         python {workflow.basedir:q}/scripts/pls_genes.py \
             --ccres {input.ccres:q} \
             --tss {input.tss:q} \
-            --tss-4k {input.tss_4k:q} \
             --output {output:q}
 
         sync {output:q}
