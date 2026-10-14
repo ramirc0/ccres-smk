@@ -7,6 +7,9 @@ software-deployment-cache-prefix: ~/.cache/snakemake/software
 
 jobs: 100
 max-jobs-per-second: 5
+# The default ILP scheduler solves a model for each batch of finished jobs and
+# bounds the main loop. This workflow has no temp files or priorities to weigh.
+scheduler: greedy
 
 slurm-efficiency-report: true
 slurm-efficiency-report-path: logs/efficiency
