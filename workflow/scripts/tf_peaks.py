@@ -6,9 +6,9 @@ experiment, target, biosample and `<experiment>-<line>`. A peak under 150 bp
 becomes summit +-75 and one over 350 bp summit +-175, where the summit is
 start + column 10. Other peaks pass unchanged.
 
-tmp.summits holds [start + column 10, +1) of each row. For a resized peak the
-start is already the new one, so that point is not the summit. The quirk is
-kept.
+tmp.summits holds [start + column 10, +1) of each row. A resized peak's
+column 10 becomes 75 or 175, so that point stays on its summit. The original
+kept the old offset, which moved the point off the summit.
 """
 
 import argparse
@@ -51,7 +51,8 @@ def resized(peaks, exp, target, biosample):
     Returns
     -------
     polars.DataFrame
-        14 string columns, as the original awk printed them.
+        14 string columns, as the original awk printed them, except column
+        10 of resized peaks.
     """
     if any((peaks[c] == "").any() for c in NARROWPEAK):
         raise ValueError(f"{exp}: empty field. awk would shift the columns.")
@@ -68,6 +69,7 @@ def resized(peaks, exp, target, biosample):
     return peaks.with_columns(
         c2=pl.coalesce((summit - half).cast(pl.String), pl.col("c2")),
         c3=pl.coalesce((summit + half).cast(pl.String), pl.col("c3")),
+        c10=pl.coalesce(half.cast(pl.String), pl.col("c10")),
         c11=pl.lit(exp),
         c12=pl.lit(target),
         c13=pl.lit(biosample),
