@@ -265,8 +265,28 @@ def sorted_lines(lines, text_key, numeric_key=None):
     return [lines[i] for i in order]
 
 
+def summit_intervals(peaks):
+    """Return the summit base of each narrowPeak row.
+
+    The summit is start + column 10, as in step 3. Split-cCREs.TF.sh took the
+    base before it.
+
+    Parameters
+    ----------
+    peaks : polars.DataFrame
+        The narrowPeak string columns c1-c10.
+
+    Returns
+    -------
+    polars.DataFrame
+        The chrom, start and end of each summit.
+    """
+    summit = pl.col("c2").cast(pl.Int64) + pl.col("c10").cast(pl.Int64)
+    return peaks.select(chrom="c1", start=summit, end=summit + 1)
+
+
 def tf_summits(args):
-    """Read the TF peak summits of the biosample as [summit - 1, summit).
+    """Read the summits of the biosample's TF peaks.
 
     Parameters
     ----------
@@ -287,9 +307,7 @@ def tf_summits(args):
         path = _encode.encode_path(
             args.encode_root, args.download_dir, row[0], row[1], "bed.gz"
         )
-        peaks = _bed.read_tsv(path, NARROWPEAK)
-        summit = pl.col("c2").cast(pl.Int64) + pl.col("c10").cast(pl.Int64)
-        parts.append(peaks.select(chrom="c1", start=summit - 1, end=summit))
+        parts.append(summit_intervals(_bed.read_tsv(path, NARROWPEAK)))
     return (
         pl.concat(parts)
         if parts
