@@ -10,6 +10,11 @@ max-jobs-per-timespan: 5/1s
 # The default ILP scheduler solves a model for each batch of finished jobs and
 # bounds the main loop. This workflow has no temp files or priorities to weigh.
 scheduler: greedy
+# One SLURM job runs a hotspot row's call_dhs, then its process_dhs. A group's
+# runtime is the sum of its jobs' runtimes.
+groups:
+  call_dhs: dhs
+  process_dhs: dhs
 
 slurm-efficiency-report: true
 slurm-efficiency-report-path: logs/efficiency
@@ -26,10 +31,10 @@ default-resources:
 set-resources:              # tune from benchmarks/ TSVs after a real run
   call_dhs:
     mem_mb: 32000 * attempt
-    runtime: 30m
+    runtime: 20m
   process_dhs:
     mem_mb: 4000 * attempt
-    runtime: 30m
+    runtime: 10m
   combine_dhs:
     slurm_partition: 4hours
     mem_mb: 100000 * attempt
