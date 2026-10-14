@@ -22,13 +22,29 @@ def build_parser():
         Parser for the freeze_input.py flags.
     """
     p = argparse.ArgumentParser(description="Freeze one pipeline input.")
-    p.add_argument("--sources", nargs="+", required=True, help="Source file(s).")
+    p.add_argument(
+        "--sources",
+        nargs="+",
+        required=True,
+        help="Source file, then the frozen inputs the kind reads.",
+    )
     p.add_argument(
         "--kind",
         default="copy",
-        choices=["copy", "previous-ccres", "biosample-keys"],
+        choices=[
+            "copy",
+            "previous-ccres",
+            "refresh",
+            "tf-list",
+            "hotspot-list",
+            "biosample-keys",
+        ],
         help="How to build the frozen file from its sources.",
     )
+    p.add_argument(
+        "--metadata", type=Path, help="ENCODE metadata snapshot, for derived lists."
+    )
+    p.add_argument("--assembly", help="Genome assembly, as ENCODE names it.")
     p.add_argument(
         "--checksums", required=True, help="b3sum-format file of expected sums."
     )
@@ -314,7 +330,7 @@ def write_biosample_keys(lists, meta, out):
     lists : list of str
         Lists whose first two columns are experiment and file. A file of NA
         is skipped.
-    meta : str
+    meta : pathlib.Path
         Directory of the ENCODE metadata snapshot.
     out : str
         Table to write: experiment, file, key, key without tagging
@@ -327,9 +343,293 @@ def write_biosample_keys(lists, meta, out):
     pairs = pl.DataFrame(
         sorted(p for p in pairs if p[1] != "NA"), schema=["exp", "file"], orient="row"
     )
-    experiment_keys(pairs, Path(meta)).write_csv(
+    experiment_keys(pairs, meta).write_csv(
         out, separator="\t", include_header=False, quote_style="never"
     )
+
+
+FILE_COLUMNS = [
+    "accession",
+    "dataset",
+    "status",
+    "output_type",
+    "file_format",
+    "biological_replicates",
+    "genome_assembly",
+    "analyses",
+]
+# The DNase pipeline's per-replicate outputs that a hotspot list row names.
+HOTSPOT_FILES = {
+    "FDR cut rate": "bed",
+    "read-depth normalized signal": "bigWig",
+    "peaks": "starch",
+}
+# No analysis holds both names. Both pair with conservative IDR peaks.
+RENAMED = {"optimal IDR thresholded peaks": "IDR thresholded peaks"}
+
+
+def file_table(meta):
+    """Read the file report of a metadata snapshot, each file with its experiment.
+
+    Parameters
+    ----------
+    meta : pathlib.Path
+        Directory of the ENCODE metadata snapshot.
+
+    Returns
+    -------
+    polars.DataFrame
+        The `FILE_COLUMNS` and exp, the accession of the file's dataset now.
+    """
+    return pl.read_parquet(meta / "file.parquet", columns=FILE_COLUMNS).with_columns(
+        exp=pl.col("dataset").str.extract(r"^/experiments/(\w+)/$")
+    )
+
+
+def default_files(files, meta, assembly):
+    """Keep the released files of each experiment's default analysis.
+
+    Parameters
+    ----------
+    files : polars.DataFrame
+        Output of `file_table`.
+    meta : pathlib.Path
+        Directory of the ENCODE metadata snapshot.
+    assembly : str
+        Genome assembly, as ENCODE names it (GRCh38, mm10).
+
+    Returns
+    -------
+    polars.DataFrame
+        The released files of the assembly in their experiment's default
+        analysis.
+    """
+    analysis = pl.read_parquet(
+        meta / "experiment.parquet", columns=["accession", "default_analysis"]
+    )
+    return (
+        files.filter(
+            (pl.col("status") == "released") & (pl.col("genome_assembly") == assembly)
+        )
+        .join(analysis, left_on="exp", right_on="accession")
+        .filter(
+            pl.col("analyses").str.contains(pl.col("default_analysis"), literal=True)
+        )
+    )
+
+
+def refresh(rows, meta, assembly):
+    """Drop list rows whose file was withdrawn and swap archived files.
+
+    A kept row takes its file's experiment now. An archived file gives way to
+    the released file of its experiment's default analysis with the same
+    format and output type whose replicates are the largest subset of its
+    own. ENCODE4 calls the optimal IDR thresholded peaks of older pipelines
+    `IDR thresholded peaks`. A file neither released nor archived, such as a
+    revoked one, drops its row. A file of NA stays as it is.
+
+    Parameters
+    ----------
+    rows : list of list of str
+        List rows: experiment, file, then columns that stay.
+    meta : pathlib.Path
+        Directory of the ENCODE metadata snapshot.
+    assembly : str
+        Genome assembly, as ENCODE names it.
+
+    Returns
+    -------
+    list of list of str
+        The refreshed rows, in order.
+
+    Raises
+    ------
+    ValueError
+        If an archived file has no single replacement.
+    """
+    files = file_table(meta).with_columns(
+        pl.col("output_type").replace(RENAMED),
+        replicates=pl.col("biological_replicates").str.split(","),
+    )
+    listed = files.filter(pl.col("accession").is_in([row[1] for row in rows]))
+    same = ["exp", "output_type", "file_format"]
+    archived = listed.filter(pl.col("status") == "archived").select(
+        *same, old="accession", old_replicates="replicates"
+    )
+    size = pl.col("replicates").list.len()
+    found = (
+        default_files(files, meta, assembly)
+        .join(archived, on=same)
+        .filter(
+            pl.col("replicates").list.set_difference("old_replicates").list.len() == 0
+        )
+        .group_by("old")
+        .agg(pl.col("accession").filter(size == size.max()))
+    )
+    swaps = {old: new[0] for old, new in found.iter_rows() if len(new) == 1}
+    if missing := set(archived["old"]) - set(swaps):
+        raise ValueError(f"No single replacement for the archived files {missing}.")
+    records = files.filter(
+        pl.col("accession").is_in([*listed["accession"], *swaps.values()])
+    )
+    status = dict(records.select("accession", "status").iter_rows())
+    experiment = dict(records.select("accession", "exp").iter_rows())
+    out = []
+    for exp, acc, *rest in rows:
+        acc = swaps.get(acc, acc)
+        if acc == "NA":
+            out.append([exp, acc, *rest])
+        elif status[acc] == "released":
+            out.append([experiment[acc], acc, *rest])
+    return out
+
+
+def encode_frip(rows, meta):
+    """Set each TF list row's FRiP to ENCODE's FRiP of its peak file.
+
+    The listed FRiPs are ENCODE's peak enrichment QC, where a file has one. A
+    row whose file has none keeps its FRiP.
+
+    Parameters
+    ----------
+    rows : list of list of str
+        TF list rows: experiment, peak file, biosample, target, FRiP, then
+        other columns.
+    meta : pathlib.Path
+        Directory of the ENCODE metadata snapshot.
+
+    Returns
+    -------
+    list of list of str
+        The rows, in order.
+    """
+    frip = dict(
+        pl.read_parquet(
+            meta / "chip_peak_enrichment_quality_metric.parquet",
+            columns=["files", "status", "frip_score_of_peaks"],
+        )
+        .filter(pl.col("status") == "released")
+        .select(pl.col("files").str.extract(r"^/files/(\w+)/$"), "frip_score_of_peaks")
+        .drop_nulls()
+        .iter_rows()
+    )
+    return [[*row[:4], str(frip.get(row[1], row[4])), *row[5:]] for row in rows]
+
+
+def hotspot_rows(hotspots, dnase, meta, assembly):
+    """Rebuild the hotspot list from the default analyses of its experiments.
+
+    A row is one biological replicate: the FDR cut rate, normalized signal
+    and Hotspot2 peaks it has in the default analysis of the experiment that
+    holds them now, then the replicate, the lab and the biosample summary.
+    The listed rows come first, in order, each rebuilt from the experiment and
+    replicate of its FDR file. A row whose FDR file was withdrawn is dropped.
+    The other replicates of the listed experiments follow, then those of the
+    DNase list's experiments that the hotspot list lacks.
+
+    Parameters
+    ----------
+    hotspots : list of list of str
+        Hotspot list rows: experiment, FDR file, then other columns.
+    dnase : list of list of str
+        DNase list rows: experiment, signal file, then other columns.
+    meta : pathlib.Path
+        Directory of the ENCODE metadata snapshot.
+    assembly : str
+        Genome assembly, as ENCODE names it.
+
+    Returns
+    -------
+    list of list of str
+        Experiment, FDR file, signal file, peaks file, replicate, lab and
+        biosample summary of each row.
+
+    Raises
+    ------
+    ValueError
+        If a listed replicate has no row, or two files of one kind.
+    """
+    files = file_table(meta)
+    listed = {
+        f["accession"]: f
+        for f in files.filter(
+            pl.col("accession").is_in([r[1] for r in hotspots + dnase])
+        ).iter_rows(named=True)
+        if f["status"] in ("released", "archived")
+    }
+    keys = [
+        (listed[r[1]]["exp"], listed[r[1]]["biological_replicates"])
+        for r in hotspots
+        if r[1] in listed
+    ]
+    dnase_exps = [listed[r[1]]["exp"] for r in dnase if r[1] in listed]
+    order = list(dict.fromkeys([e for e, _ in keys] + dnase_exps))
+    wanted = [{"output_type": o, "file_format": f} for o, f in HOTSPOT_FILES.items()]
+    found = default_files(files, meta, assembly).filter(
+        pl.col("exp").is_in(order)
+        & pl.struct("output_type", "file_format").is_in(wanted)
+        & ~pl.col("biological_replicates").str.contains(",")
+    )
+    kind = ["exp", "biological_replicates", "output_type"]
+    if found.select(kind).is_duplicated().any():
+        raise ValueError("A replicate has two files of one kind in its analysis.")
+    experiments = pl.read_parquet(
+        meta / "experiment.parquet", columns=["accession", "lab", "biosample_summary"]
+    )
+    table = (
+        found.group_by("exp", "biological_replicates")
+        .agg(
+            pl.col("accession")
+            .filter(pl.col("output_type") == output)
+            .first()
+            .alias(output)
+            for output in HOTSPOT_FILES
+        )
+        .drop_nulls()
+        .join(experiments, left_on="exp", right_on="accession")
+    )
+    rows = {
+        (exp, rep): [exp, fdr, signal, peaks, rep, lab, biosample]
+        for exp, rep, fdr, signal, peaks, lab, biosample in table.select(
+            "exp", "biological_replicates", *HOTSPOT_FILES, "lab", "biosample_summary"
+        ).iter_rows()
+    }
+    if missing := [k for k in keys if k not in rows]:
+        raise ValueError(f"No hotspot files for the listed replicates {missing}.")
+    for exp in order:
+        keys += sorted((k for k in rows if k[0] == exp), key=lambda k: int(k[1]))
+    return [rows[k] for k in dict.fromkeys(keys)]
+
+
+def read_rows(path):
+    """Read a tab-separated list.
+
+    Parameters
+    ----------
+    path : str
+        List file.
+
+    Returns
+    -------
+    list of list of str
+        Fields of each line.
+    """
+    with open(path) as f:
+        return [line.rstrip("\n").split("\t") for line in f]
+
+
+def write_rows(rows, path):
+    """Write rows as tab-separated lines.
+
+    Parameters
+    ----------
+    rows : list of list of str
+        Fields of each line.
+    path : str
+        List file to write.
+    """
+    with open(path, "w") as f:
+        f.writelines("\t".join(row) + "\n" for row in rows)
 
 
 def read_checksums(path):
@@ -349,6 +649,42 @@ def read_checksums(path):
         return {key: digest for digest, key in (line.split() for line in f)}
 
 
+def build(kind, sources, meta, assembly, out):
+    """Build a frozen input from its sources.
+
+    Parameters
+    ----------
+    kind : str
+        How: copy, previous-ccres, refresh, tf-list, hotspot-list or
+        biosample-keys.
+    sources : list of str
+        Source file, then the frozen inputs the kind reads.
+    meta : pathlib.Path or None
+        Directory of the ENCODE metadata snapshot, for derived lists.
+    assembly : str or None
+        Genome assembly, as ENCODE names it, for refreshed lists.
+    out : str
+        File to write.
+    """
+    if kind == "copy":
+        (src,) = sources
+        shutil.copyfile(src, out)
+    elif kind == "previous-ccres":
+        (src,) = sources
+        previous_ccres(src, out)
+    elif kind in ("refresh", "tf-list"):
+        (src,) = sources
+        rows = refresh(read_rows(src), meta, assembly)
+        if kind == "tf-list":
+            rows = encode_frip(rows, meta)
+        write_rows(rows, out)
+    elif kind == "hotspot-list":
+        hotspots, dnase = map(read_rows, sources)
+        write_rows(hotspot_rows(hotspots, dnase, meta, assembly), out)
+    else:
+        write_biosample_keys(sources, meta, out)
+
+
 def main(argv=None):
     """Build the frozen file and fail unless its checksum is the recorded one.
 
@@ -358,16 +694,7 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-
-    if args.kind == "copy":
-        (src,) = args.sources
-        shutil.copyfile(src, args.output)
-    elif args.kind == "previous-ccres":
-        (src,) = args.sources
-        previous_ccres(src, args.output)
-    else:
-        *lists, meta = args.sources
-        write_biosample_keys(lists, meta, args.output)
+    build(args.kind, args.sources, args.metadata, args.assembly, args.output)
 
     digest = blake3.blake3(max_threads=blake3.blake3.AUTO).update_mmap(args.output)
     digest = digest.hexdigest()

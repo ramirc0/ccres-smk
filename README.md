@@ -42,7 +42,7 @@ pyproject.toml           ruff + numpydoc config
 Data lives under `data/`, a gitignored symlink to the data volume:
 
 ```
-data/inputs/<genome>/            frozen inputs
+data/inputs-2026-10-09/<genome>/ frozen inputs (inputs_dir)
 data/encode/<exp>/<file>.<ext>   ENCODE files missing from the local mirror
 data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome>/
 ```
@@ -81,16 +81,26 @@ class, though the paper's Fig. 1 lists it among the classifying signals.
 
 ## Inputs
 
-`freeze_input` copies each source in `config.yaml` to `data/inputs/<genome>/` and fails unless the
-copy matches its line in `config/inputs.b3`. Sources can change upstream, so a changed source can
-never reach a run unnoticed. Two inputs are derived:
+`freeze_input` builds each input of `config.yaml` in `<inputs_dir>/<genome>/` and fails unless the
+result matches its line in `config/inputs.b3`. Sources can change upstream, so a changed source can
+never reach a run unnoticed. Most inputs are copies. A config entry with a `kind` derives its input
+from its `source` and the frozen inputs it names. All kinds but `previous-ccres` read the ENCODE
+metadata snapshot:
 
-- `cCREs-Previous.bed`: the V1-V3 rows of `Previous-Versions/cCREs.<genome>.bed.gz`. The file now
+- `refresh` (the mark lists) and `tf-list`: the release's list, brought up to the snapshot. A row
+  keeps its file, under the file's experiment now. A revoked file drops its row. An archived file
+  gives way to the released file of its experiment's default analysis with the same format and
+  output type whose replicates are the largest subset of its own. A TF row takes its file's FRiP
+  from ENCODE's peak enrichment QC.
+- `hotspot-list`: a row per replicate of the default analysis of each experiment in the release's
+  hotspot list or in the DNase list. The release's rows come first, in order. The release lacked
+  178 hg38 and 15 mm10 experiments of its own DNase lists.
+- `previous-ccres`: the V1-V3 rows of `Previous-Versions/cCREs.<genome>.bed.gz`. The file now
   also holds V4, the release this port reproduces.
-- `Biosample-Keys.txt`: a key for each experiment file of the mark lists and `TF-List-All.txt`,
-  from the ENCODE metadata snapshot. It is the sorted set of the biosamples whose replicates made the
-  file. A biosample is its ontology term, donor (a mouse's strain background), treatments, age, life
-  stage, sex, differentiation time, genetic modifications, cell-cycle phase, diseases and origin.
+- `biosample-keys`: a key for each experiment file of the mark lists and `TF-List-All.txt`. It is
+  the sorted set of the biosamples whose replicates made the file. A biosample is its ontology
+  term, donor (a mouse's strain background), treatments, age, life stage, sex, differentiation
+  time, genetic modifications, cell-cycle phase, diseases and origin.
 
 Step 7 joins experiments into master list rows on their keys. The release joined them on the
 biosample names in the lists, which spell some biosamples several ways and name some pooled sets
@@ -99,7 +109,7 @@ experiment that passes step 3's filter has its key, tagging modifications aside.
 flagged the biosamples of a curated list (121 in hg38).
 
 The frozen lists set which jobs exist, so Snakemake reads them while it builds the DAG. A fresh
-`data/inputs/` therefore needs the `freeze` target before any other run.
+`inputs_dir` therefore needs the `freeze` target before any other run.
 
 ENCODE files resolve to `<encode_root>/<exp>/<file>.<ext>`, a local mirror. A file missing there
 downloads from ENCODE's public S3 bucket to `data/encode/`. Its key and MD5 come from the ENCODE
@@ -110,7 +120,7 @@ missing file a run reads, so the run itself needs no network.
 
 ```bash
 cp config/config.yaml.template config/config.yaml  # then edit
-pixi run snakemake --profile profiles/slurm freeze # once, on a fresh data/inputs/
+pixi run snakemake --profile profiles/slurm freeze # once, on a fresh inputs_dir
 pixi run snakemake --profile profiles/slurm download # ENCODE files the mirror lacks
 pixi run snakemake -n -p --profile profiles/local  # dry run
 pixi run snakemake --profile profiles/local        # local

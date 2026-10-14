@@ -8,7 +8,8 @@ The lists are synthetic. Their rows point to real ENCODE files, and their
 biosample names are chosen so that every branch of step 7 runs: toy_tf (DNase
 and TF), toy_dnase (DNase, partial marks) and toy_nodnase (no DNase, an NA
 H3K4me3 file). A toy metadata snapshot gives each name one biosample, so the
-biosample keys group the rows by name. The ENCODE mirror at
+biosample keys group the rows by name. Every listed file is released in one
+default analysis, so the refreshed lists keep their rows. The ENCODE mirror at
 /data/projects/encode/data must exist.
 """
 
@@ -17,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import blake3
@@ -37,6 +39,18 @@ WINDOWS = {
     "mm10": ("chr19", 5_000_000, 5_500_000),
 }
 TF_EXPERIMENTS = 6
+MARK_LISTS = [f"{m}-List.txt" for m in ("DNase", "H3K4me3", "H3K27ac", "CTCF", "ATAC")]
+# Every kind of freeze_input but copy, with the frozen inputs each reads.
+KINDS = {
+    "Hotspot-List.txt": ("hotspot-list", ["DNase-List.txt"]),
+    **dict.fromkeys(MARK_LISTS, ("refresh", [])),
+    "TF-List-All.txt": ("tf-list", []),
+    "Biosample-Keys.txt": ("biosample-keys", [*MARK_LISTS[:4], "TF-List-All.txt"]),
+    "cCREs-Previous.bed": ("previous-ccres", []),
+}
+ANALYSIS = "/analyses/ENCAN000TOY/"
+# Output type and format of the files a hotspot row names, in column order.
+HOTSPOT_FILES = list(freeze_input.HOTSPOT_FILES.items())
 
 
 def rows(path):
@@ -153,9 +167,10 @@ def build(genome):
 
     Returns
     -------
-    tuple of (dict, list of tuple of str)
-        Frozen input name to fixture source path(s), relative to the test dir,
-        and the experiment, file and biosample name of every list row.
+    tuple of (dict, list of tuple of str, list of list of str)
+        Frozen input name to fixture source path, relative to the test dir,
+        the experiment, file and biosample name of every list row, and the
+        hotspot list rows.
     """
     window = WINDOWS[genome]
     frozen = ROOT / "data" / "inputs" / genome
@@ -248,30 +263,42 @@ def build(genome):
         )
     }
     sources["cCREs-Previous.bed"] = f"{rel}/cCREs.bed.gz"
-    return sources, named
+    return sources, named, hotspots
 
 
-def write_metadata(named, meta):
+def write_metadata(built, meta):
     """Write a metadata snapshot that gives each biosample name one biosample.
 
-    Each file gets a replicate and library of its own, and each experiment a
-    release date.
+    A hotspot row's files form its replicate. Each other list file gets a
+    replicate and library of its own. Every file is released in its
+    experiment's default analysis. A hotspot experiment keeps its listed lab
+    and biosample summary.
 
     Parameters
     ----------
-    named : list of tuple of str
-        Experiment, file and biosample name of every list row.
+    built : dict
+        Output of `build` per genome.
     meta : pathlib.Path
         Directory to write the Parquet files in.
     """
     meta.mkdir(parents=True, exist_ok=True)
-    exps = sorted({exp for exp, _, _ in named})
-    names = sorted({name for _, _, name in named})
-    files = sorted({(exp, acc, name) for exp, acc, name in named if acc != "NA"})
-    # Each file is its own replicate, so two replicates can carry two names.
-    replicate = {}
-    for f in files:
-        replicate[f] = 1 + sum(exp == f[0] for exp, _, _ in replicate)
+    assembly = assemblies()
+    files, experiments, listed = {}, {}, set()
+    for genome, (_, named, hotspots) in built.items():
+        for r in hotspots:
+            experiments[r[0]] = (r[5], r[6])
+            for acc, (output, form) in zip(r[1:4], HOTSPOT_FILES):
+                files[acc] = (r[0], r[4], output, form, assembly[genome])
+        for exp, acc, name in sorted({tuple(row) for row in named}):
+            experiments.setdefault(exp, ("lab", name))
+            if acc == "NA":
+                continue
+            listed.add((exp, acc, name))
+            if acc not in files:
+                rep = str(1 + sum(f[0] == exp for f in files.values()))
+                files[acc] = (exp, rep, None, None, assembly[genome])
+    listed = sorted(listed)
+    names = sorted({name for _, _, name in listed})
     string = pl.String
     pl.DataFrame(
         {
@@ -299,28 +326,45 @@ def write_metadata(named, meta):
             "post_differentiation_time": pl.Series([None] * len(names), dtype=pl.Int64),
         }
     ).write_parquet(meta / "biosample.parquet")
-    library = [f"/libraries/{f[0]}-{replicate[f]}/" for f in files]
+    library = [f"/libraries/{exp}-{files[acc][1]}/" for exp, acc, _ in listed]
     pl.DataFrame(
-        {"id": library, "biosample": [f"/biosamples/{name}/" for _, _, name in files]}
+        {"id": library, "biosample": [f"/biosamples/{name}/" for _, _, name in listed]}
     ).write_parquet(meta / "library.parquet")
     pl.DataFrame(
         {
-            "experiment": [f"/experiments/{exp}/" for exp, _, _ in files],
-            "biological_replicate": [replicate[f] for f in files],
+            "experiment": [f"/experiments/{exp}/" for exp, _, _ in listed],
+            "biological_replicate": [int(files[acc][1]) for _, acc, _ in listed],
             "library": library,
             "status": "released",
         }
     ).write_parquet(meta / "replicate.parquet")
-    pl.DataFrame({"accession": exps, "date_released": "2020-01-01"}).write_parquet(
-        meta / "experiment.parquet"
-    )
     pl.DataFrame(
-        {
-            "accession": [acc for _, acc, _ in files],
-            "dataset": [f"/experiments/{exp}/" for exp, _, _ in files],
-            "biological_replicates": [str(replicate[f]) for f in files],
-        }
-    ).write_parquet(meta / "file.parquet")
+        [(exp, "2020-01-01", ANALYSIS, *e) for exp, e in sorted(experiments.items())],
+        schema=[
+            "accession",
+            "date_released",
+            "default_analysis",
+            "lab",
+            "biosample_summary",
+        ],
+        orient="row",
+    ).write_parquet(meta / "experiment.parquet")
+    pl.DataFrame(
+        [
+            (acc, f"/experiments/{exp}/", rep, output, form, genome, ANALYSIS)
+            for acc, (exp, rep, output, form, genome) in sorted(files.items())
+        ],
+        schema={
+            "accession": string,
+            "dataset": string,
+            "biological_replicates": string,
+            "output_type": string,
+            "file_format": string,
+            "genome_assembly": string,
+            "analyses": string,
+        },
+        orient="row",
+    ).with_columns(status=pl.lit("released")).write_parquet(meta / "file.parquet")
     treatment = ["id", "biosample_treatment_term_id", "biosample_treatment"]
     for name, schema in (
         (
@@ -335,77 +379,103 @@ def write_metadata(named, meta):
         ),
         ("genetic_modification", dict.fromkeys(["id", "accession", "purpose"], string)),
         ("mouse_donor", dict.fromkeys(["id", "strain_background"], string)),
+        (
+            "chip_peak_enrichment_quality_metric",
+            {"files": string, "status": string, "frip_score_of_peaks": pl.Float64},
+        ),
     ):
         pl.DataFrame(schema=schema).write_parquet(meta / f"{name}.parquet")
+
+
+def template_head():
+    """Return the config template up to its inputs.
+
+    Returns
+    -------
+    str
+        Run settings and per-genome constants.
+    """
+    config = (ROOT / "config" / "config.yaml.template").read_text()
+    return config[: config.index("\ninputs:\n") + 1]
+
+
+def assemblies():
+    """Read each genome's ENCODE assembly name from the config template.
+
+    Returns
+    -------
+    dict of str to str
+        Assembly per genome.
+    """
+    return dict(
+        re.findall(r"^  (\w+):\n    assembly: (\S+)", template_head(), re.MULTILINE)
+    )
+
+
+def entries(sources):
+    """List a genome's frozen inputs, each with how the test config builds it.
+
+    Parameters
+    ----------
+    sources : dict of str to str
+        Frozen input name to fixture source path.
+
+    Returns
+    -------
+    dict of str to tuple
+        Kind, source path or None, and the frozen inputs it reads.
+    """
+    specs = {}
+    for name in [*sources, "Biosample-Keys.txt"]:
+        kind, frozen = KINDS.get(name, ("copy", []))
+        specs[name] = (kind, sources.get(name), frozen)
+    return specs
 
 
 def main():
     """Build both genomes' fixtures, then the test config and checksums."""
     built = {genome: build(genome) for genome in WINDOWS}
-    sources = {genome: s for genome, (s, _) in built.items()}
-    write_metadata(
-        [row for _, named in built.values() for row in named],
-        HERE / "resources" / "metadata",
-    )
-    config = (ROOT / "config" / "config.yaml.template").read_text()
-    head = config[: config.index("sources:")]
+    meta = HERE / "resources" / "metadata"
+    write_metadata(built, meta)
+    head = template_head()
     head = head.replace(
         "encode_root: /data/projects/encode/data", "encode_root: resources/encode"
     )
     head = re.sub(r"encode_metadata: \S+", "encode_metadata: resources/metadata", head)
-    lines = [head, "sources:\n"]
-    for genome, names in sources.items():
+    lines = [head, "inputs:\n"]
+    sums = []
+    assembly = assemblies()
+    (HERE / "data").mkdir(exist_ok=True)
+    for genome, (sources, _, _) in built.items():
         lines.append(f"  {genome}:\n")
-        for name, src in names.items():
-            if isinstance(src, list):
-                lines.append(f"    {name}:\n" + "".join(f"      - {s}\n" for s in src))
-            else:
+        specs = entries(sources)
+        for name, (kind, src, frozen) in specs.items():
+            if kind == "copy":
                 lines.append(f"    {name}: {src}\n")
+                continue
+            lines.append(f"    {name}:\n      kind: {kind}\n")
+            if src:
+                lines.append(f"      source: {src}\n")
+            if frozen:
+                lines.append(f"      frozen: [{', '.join(frozen)}]\n")
+        digests = {}
+        with tempfile.TemporaryDirectory(dir=HERE / "data") as tmp:
+            # Inputs that read frozen ones come after them.
+            for name in sorted(specs, key=lambda n: bool(specs[n][2])):
+                kind, src, frozen = specs[name]
+                out = Path(tmp, name)
+                freeze_input.build(
+                    kind,
+                    [*([HERE / src] if src else []), *(Path(tmp, f) for f in frozen)],
+                    meta,
+                    assembly[genome],
+                    out,
+                )
+                digests[name] = blake3.blake3(out.read_bytes()).hexdigest()
+        sums += [f"{digests[name]}  {genome}/{name}\n" for name in specs]
     (HERE / "config").mkdir(exist_ok=True)
     (HERE / "config" / "config.yaml").write_text("".join(lines))
-
-    sums = []
-    for genome, names in sources.items():
-        lists = ["DNase", "H3K4me3", "H3K27ac", "CTCF", "TF"]
-        keyed = [
-            names[f"{m}-List-All.txt" if m == "TF" else f"{m}-List.txt"] for m in lists
-        ]
-        derived = {"Biosample-Keys.txt": [*keyed, "resources/metadata"]}
-        for name, src in {**names, **derived}.items():
-            frozen = HERE / "data" / "inputs" / genome / name
-            sums.append(f"{_digest(src, name, frozen)}  {genome}/{name}\n")
     (HERE / "config" / "inputs.b3").write_text("".join(sums))
-
-
-def _digest(src, name, scratch):
-    """Return the BLAKE3 digest a source freezes to.
-
-    Parameters
-    ----------
-    src : str or list of str
-        Source path(s), relative to the test dir.
-    name : str
-        Frozen input name.
-    scratch : pathlib.Path
-        Where to derive the input when it is not a plain copy.
-
-    Returns
-    -------
-    str
-        Hex digest.
-    """
-    scratch.parent.mkdir(parents=True, exist_ok=True)
-    if name == "cCREs-Previous.bed":
-        freeze_input.previous_ccres(HERE / src, scratch)
-    elif name == "Biosample-Keys.txt":
-        freeze_input.write_biosample_keys(
-            [HERE / s for s in src[:-1]], HERE / src[-1], scratch
-        )
-    else:
-        shutil.copy(HERE / src, scratch)
-    digest = blake3.blake3(scratch.read_bytes()).hexdigest()
-    scratch.unlink()
-    return digest
 
 
 if __name__ == "__main__":

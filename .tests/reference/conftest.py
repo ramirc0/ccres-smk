@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 REFERENCE = "/data/zusers/moorej3/moorej.ghpcc.project/ENCODE/Encyclopedia/V7/Registry"
+METADATA = "/home/ramirezc/Projects/encode-metadata-smk/results/2026-10-09/parquets"
 
 # step -> (glob under ours, reference path template, mode[, genomes]).
 # Templates take {g} (genome), {name} (the release's basename of our file) and
@@ -178,7 +179,7 @@ def release_name(path, ours_dir):
 
 
 def pytest_addoption(parser):
-    """Add the result and reference directory options.
+    """Add the result, reference, frozen input and metadata directory options.
 
     Parameters
     ----------
@@ -195,10 +196,18 @@ def pytest_addoption(parser):
         default=REFERENCE,
         help="Directory holding the V7-<genome> reference trees.",
     )
+    parser.addoption(
+        "--inputs",
+        default="data/inputs-2026-10-09",
+        help="Frozen inputs, one subdirectory per genome.",
+    )
+    parser.addoption(
+        "--metadata", default=METADATA, help="ENCODE metadata snapshot of the inputs."
+    )
 
 
 def pytest_configure(config):
-    """Register one marker per step, for selection with `-m <step>`.
+    """Register one marker per step and one for the inputs, for `-m <marker>`.
 
     Parameters
     ----------
@@ -207,6 +216,7 @@ def pytest_configure(config):
     """
     for step in STEPS:
         config.addinivalue_line("markers", f"{step}: outputs of step {step}")
+    config.addinivalue_line("markers", "inputs: frozen lists against the release's")
 
 
 def pytest_generate_tests(metafunc):

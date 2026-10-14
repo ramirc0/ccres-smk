@@ -2,11 +2,11 @@ outdir: data/results
 pixi_env: default
 run_id: v7               # outputs go under <outdir>/<run_id>/<genome>/; override per run
 
-inputs_dir: data/inputs                      # frozen inputs, checked against config/inputs.b3
+inputs_dir: data/inputs-2026-10-09           # frozen inputs, checked against config/inputs.b3
 encode_root: resources/encode      # ENCODE mirror, <exp>/<file>.<ext>
 download_dir: data/encode                    # same layout, for files missing from the mirror
 # ENCODE metadata snapshot, one Parquet file per object type. download_encode
-# reads file.parquet (s3_uri, md5sum), Biosample-Keys.txt the biosamples.
+# reads file.parquet (s3_uri, md5sum). The derived lists read the rest.
 encode_metadata: resources/metadata
 
 # Constants hardcoded in the original scripts. No published code derives them.
@@ -16,43 +16,85 @@ encode_metadata: resources/metadata
 #   DHSs". The sample and its seed were not kept.
 genomes:
   hg38:
+    assembly: GRCh38        # ENCODE's name, for the derived lists
     min_p: 4942
     dhs_signal_cutoff: 0.145873
   mm10:
+    assembly: mm10
     min_p: 4942
     dhs_signal_cutoff: 0.203923
 
-# Frozen input name -> source file(s). freeze_input copies a single source.
-# The derived inputs filter their sources (see workflow/scripts/freeze_input.py).
-# Biosample-Keys.txt, derived from the frozen lists and encode_metadata, has none.
-sources:
+# Frozen input name -> its source, which freeze_input copies, or how to derive
+# it: kind, source and the frozen inputs it reads. The kinds are in
+# workflow/scripts/freeze_input.py. Lists refresh against encode_metadata.
+inputs:
   hg38:
-    Hotspot-List.txt: resources/hg38/Hotspot-List.txt
-    DNase-List.txt: resources/hg38/DNase-List.txt
-    H3K4me3-List.txt: resources/hg38/H3K4me3-List.txt
-    H3K27ac-List.txt: resources/hg38/H3K27ac-List.txt
-    CTCF-List.txt: resources/hg38/CTCF-List.txt
-    ATAC-List.txt: resources/hg38/ATAC-List.txt
-    TF-List-All.txt: resources/hg38/TF-List-All.txt
+    Hotspot-List.txt:
+      kind: hotspot-list
+      source: resources/hg38/Hotspot-List.txt
+      frozen: [DNase-List.txt]
+    DNase-List.txt:
+      kind: refresh
+      source: resources/hg38/DNase-List.txt
+    H3K4me3-List.txt:
+      kind: refresh
+      source: resources/hg38/H3K4me3-List.txt
+    H3K27ac-List.txt:
+      kind: refresh
+      source: resources/hg38/H3K27ac-List.txt
+    CTCF-List.txt:
+      kind: refresh
+      source: resources/hg38/CTCF-List.txt
+    ATAC-List.txt:
+      kind: refresh
+      source: resources/hg38/ATAC-List.txt
+    TF-List-All.txt:
+      kind: tf-list
+      source: resources/hg38/TF-List-All.txt
     cDHSs.bed: resources/hg38/cDHSs.bed
     rDHS-Previous.bed.gz: resources/hg38/rDHS-Previous.bed.gz
     TSS-Basic.bed: resources/hg38/TSS-Basic.bed
     TSS-Basic-4K.bed: resources/hg38/TSS-Basic-4K.bed
     chromInfo.txt: resources/hg38/chromInfo.txt
     cres.as: resources/hg38/cres.as
-    cCREs-Previous.bed: resources/hg38/cCREs.bed.gz
+    cCREs-Previous.bed:
+      kind: previous-ccres
+      source: resources/hg38/cCREs.bed.gz
+    Biosample-Keys.txt:
+      kind: biosample-keys
+      frozen: [DNase-List.txt, H3K4me3-List.txt, H3K27ac-List.txt, CTCF-List.txt, TF-List-All.txt]
   mm10:
-    Hotspot-List.txt: resources/mm10/Hotspot-List.txt
-    DNase-List.txt: resources/mm10/DNase-List.txt
-    H3K4me3-List.txt: resources/mm10/H3K4me3-List.txt
-    H3K27ac-List.txt: resources/mm10/H3K27ac-List.txt
-    CTCF-List.txt: resources/mm10/CTCF-List.txt
-    ATAC-List.txt: resources/mm10/ATAC-List.txt
-    TF-List-All.txt: resources/mm10/TF-List-All.txt
+    Hotspot-List.txt:
+      kind: hotspot-list
+      source: resources/mm10/Hotspot-List.txt
+      frozen: [DNase-List.txt]
+    DNase-List.txt:
+      kind: refresh
+      source: resources/mm10/DNase-List.txt
+    H3K4me3-List.txt:
+      kind: refresh
+      source: resources/mm10/H3K4me3-List.txt
+    H3K27ac-List.txt:
+      kind: refresh
+      source: resources/mm10/H3K27ac-List.txt
+    CTCF-List.txt:
+      kind: refresh
+      source: resources/mm10/CTCF-List.txt
+    ATAC-List.txt:
+      kind: refresh
+      source: resources/mm10/ATAC-List.txt
+    TF-List-All.txt:
+      kind: tf-list
+      source: resources/mm10/TF-List-All.txt
     cDHSs.bed: resources/mm10/cDHSs.bed
     rDHS-Previous.bed.gz: resources/mm10/rDHS-Previous.bed.gz
     TSS-Basic.bed: resources/mm10/TSS-Basic.bed
     TSS-Basic-4K.bed: resources/mm10/TSS-Basic-4K.bed
     chromInfo.txt: resources/mm10/chromInfo.txt
     cres.as: resources/mm10/cres.as
-    cCREs-Previous.bed: resources/mm10/cCREs.bed.gz
+    cCREs-Previous.bed:
+      kind: previous-ccres
+      source: resources/mm10/cCREs.bed.gz
+    Biosample-Keys.txt:
+      kind: biosample-keys
+      frozen: [DNase-List.txt, H3K4me3-List.txt, H3K27ac-List.txt, CTCF-List.txt, TF-List-All.txt]

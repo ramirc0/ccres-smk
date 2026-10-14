@@ -1,39 +1,33 @@
 # Frozen inputs and ENCODE downloads.
 
-# Derived inputs filter their sources. Every other input is a plain copy.
-DERIVED = {
-    "cCREs-Previous.bed": "previous-ccres",
-    "Biosample-Keys.txt": "biosample-keys",
-}
-# Lists whose experiments Biosample-Keys.txt keys from the metadata snapshot.
-KEYED_LISTS = [
-    *(f"{mark}-List.txt" for mark in ("DNase", "H3K4me3", "H3K27ac", "CTCF")),
-    "TF-List-All.txt",
-]
 
-
-def frozen_names(genome):
-    """List the frozen inputs of a genome.
+def freeze_spec(genome, name):
+    """Return how to build a frozen input.
 
     Parameters
     ----------
     genome : str
         Genome key.
+    name : str
+        Frozen input name, a key of `config["inputs"][genome]`.
 
     Returns
     -------
-    list of str
-        The inputs with sources in the config, then Biosample-Keys.txt.
+    dict
+        kind, source (an outside file, or None) and frozen (the frozen
+        inputs it reads).
     """
-    return [*config["sources"][genome], "Biosample-Keys.txt"]
+    spec = config["inputs"][genome][name]
+    if isinstance(spec, str):
+        spec = {"source": spec}
+    return {"kind": "copy", "source": None, "frozen": [], **spec}
 
 
 def input_sources(w):
-    """Return the source files of a frozen input.
+    """Return the files a frozen input is built from.
 
     Sources live in another user's tree and keep changing. `ancient` stops
     their mtimes from triggering reruns. The checksum guards their content.
-    Biosample-Keys.txt derives from frozen lists and the metadata snapshot.
 
     Parameters
     ----------
@@ -43,20 +37,22 @@ def input_sources(w):
     Returns
     -------
     list of str
-        Source paths, outside sources flagged ancient.
+        The source flagged ancient, if any, then the frozen inputs it reads.
     """
-    if w.name == "Biosample-Keys.txt":
-        lists = [frozen(w.genome, name) for name in KEYED_LISTS]
-        return [*lists, ancient(config["encode_metadata"])]
-    src = config["sources"][w.genome][w.name]
-    return [ancient(s) for s in ([src] if isinstance(src, str) else src)]
+    spec = freeze_spec(w.genome, w.name)
+    source = [ancient(spec["source"])] if spec["source"] else []
+    return [*source, *(frozen(w.genome, name) for name in spec["frozen"])]
 
 
 # Input functions read the frozen lists to enumerate jobs, so a fresh inputs_dir
 # needs this target before any other.
 rule freeze:
     input:
-        [frozen(genome, name) for genome in GENOMES for name in frozen_names(genome)],
+        [
+            frozen(genome, name)
+            for genome in GENOMES
+            for name in config["inputs"][genome]
+        ],
 
 
 rule freeze_input:
@@ -65,7 +61,9 @@ rule freeze_input:
     output:
         f"{INPUTS}/{{genome}}/{{name}}",
     params:
-        kind=lambda w: DERIVED.get(w.name, "copy"),
+        kind=lambda w: freeze_spec(w.genome, w.name)["kind"],
+        metadata=config["encode_metadata"],
+        assembly=lambda w: config["genomes"][w.genome]["assembly"],
         key=lambda w: f"{w.genome}/{w.name}",
         checksums="config/inputs.b3",
     log:
@@ -83,6 +81,8 @@ rule freeze_input:
         python {workflow.basedir:q}/scripts/freeze_input.py \
             --sources {input:q} \
             --kind {params.kind:q} \
+            --metadata {params.metadata:q} \
+            --assembly {params.assembly:q} \
             --checksums {params.checksums:q} \
             --key {params.key:q} \
             --output {output:q}

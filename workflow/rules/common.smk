@@ -50,7 +50,7 @@ def frozen(genome, name):
     genome : str
         Genome key in `config["genomes"]`.
     name : str
-        Frozen input name, a key of `config["sources"][genome]`.
+        Frozen input name, a key of `config["inputs"][genome]`.
 
     Returns
     -------
@@ -71,7 +71,7 @@ def frozen_list(genome, name):
     genome : str
         Genome key in `config["genomes"]`.
     name : str
-        Frozen input name, a key of `config["sources"][genome]`.
+        Frozen input name, a key of `config["inputs"][genome]`.
 
     Returns
     -------
