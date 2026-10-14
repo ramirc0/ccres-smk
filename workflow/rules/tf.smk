@@ -1,8 +1,9 @@
 # Step 3: TF experiment list, peaks, rPeaks and TF clusters.
 
+import tf_list as tfl
 
-# A checkpoint, because tf_peaks reads the filtered list to find its inputs.
-checkpoint tf_list:
+
+rule tf_list:
     input:
         lambda w: frozen(w.genome, "TF-List.All.txt"),
     output:
@@ -26,6 +27,9 @@ checkpoint tf_list:
 def tf_peak_files(genome):
     """List the peak files of a genome's filtered TF experiments.
 
+    The filter of `tf_list` runs here too, so the DAG knows the files before
+    `tf_list` writes its list.
+
     Parameters
     ----------
     genome : str
@@ -37,8 +41,12 @@ def tf_peak_files(genome):
         narrowPeak path per experiment, excluded experiments left out.
     """
     excluded = config["genomes"][genome]["tf_excluded"]
-    rows = read_rows(checkpoints.tf_list.get(genome=genome).output[0])
-    return [encode_file(r[0], r[1], "bed.gz") for r in rows if r[0] not in excluded]
+    rows = read_rows(frozen_list(genome, "TF-List.All.txt"))
+    return [
+        encode_file(r[0], r[1], "bed.gz")
+        for r in rows
+        if tfl.passes(r) and r[0] not in excluded
+    ]
 
 
 rule tf_peaks:

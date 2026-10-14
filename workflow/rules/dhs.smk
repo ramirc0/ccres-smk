@@ -14,7 +14,7 @@ def processed_dhs(genome):
     list of str
         Processed DHS BED per row.
     """
-    rows = read_rows(frozen(genome, "Hotspot-List.txt"))
+    rows = read_rows(frozen_list(genome, "Hotspot-List.txt"))
     return [
         f"{OUTDIR}/{genome}/rDHS/Processed-DHSs/{r[2]}.{i}.bed"
         for i, r in enumerate(rows, start=1)
@@ -149,7 +149,7 @@ rule derive_constants:
         hotspots=lambda w: frozen(w.genome, "Hotspot-List.txt"),
         peaks=lambda w: [
             ancient(encode_file(r[0], r[1], "bed.gz"))
-            for r in read_rows(frozen(w.genome, "Hotspot-List.txt"))
+            for r in read_rows(frozen_list(w.genome, "Hotspot-List.txt"))
         ],
         dhs_all=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
     output:

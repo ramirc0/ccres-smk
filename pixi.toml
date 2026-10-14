@@ -16,7 +16,8 @@ snakemake-executor-plugin-slurm = "==2.8.0"
 snakemake-executor-plugin-slurm-jobstep = "==0.6.1"
 
 [tasks]
-test = "snakemake --snakefile workflow/Snakefile --directory .tests/integration --profile profiles/local --cores 2 --forceall"
+test-freeze = "snakemake --snakefile workflow/Snakefile --directory .tests/integration --profile profiles/local --cores 2 freeze"
+test = { cmd = "snakemake --snakefile workflow/Snakefile --directory .tests/integration --profile profiles/local --cores 2 --forceall", depends-on = ["test-freeze"] }
 unit = "pixi run --manifest-path workflow/envs/pixi.toml --environment test pytest .tests/unit"
 # Compares data/results/v7 with the May 2022 release. Select steps with -m <step>.
 reference = "pixi run --manifest-path workflow/envs/pixi.toml --environment test pytest .tests/reference"

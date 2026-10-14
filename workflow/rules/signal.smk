@@ -19,7 +19,7 @@ def mark_signal_files(genome, mark):
     list of str
         One z-score table per row of the mark list.
     """
-    rows = read_rows(frozen(genome, f"{mark}-List.txt"))
+    rows = read_rows(frozen_list(genome, f"{mark}-List.txt"))
     return [f"{OUTDIR}/{genome}/signal-output/{mark}/{r[0]}-{r[1]}.txt" for r in rows]
 
 

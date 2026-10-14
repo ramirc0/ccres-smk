@@ -27,8 +27,14 @@ def input_sources(w):
     return [ancient(s) for s in ([src] if isinstance(src, str) else src)]
 
 
-# A checkpoint, because input functions read the frozen lists to enumerate jobs.
-checkpoint freeze_input:
+# Input functions read the frozen lists to enumerate jobs, so a fresh inputs_dir
+# needs this target before any other.
+rule freeze:
+    input:
+        [frozen(genome, name) for genome in GENOMES for name in config["sources"][genome]],
+
+
+rule freeze_input:
     input:
         input_sources,
     output:

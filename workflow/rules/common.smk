@@ -1,7 +1,10 @@
 # Config, per-genome lists, ENCODE path resolution, and wildcards.
 
+import os
 import sys
 from functools import cache
+
+from snakemake.exceptions import WorkflowError
 
 sys.path.insert(0, f"{workflow.basedir}/scripts")
 from _encode import encode_path
@@ -40,10 +43,7 @@ wildcard_constraints:
 
 
 def frozen(genome, name):
-    """Return the path of a frozen input, scheduling its freeze if needed.
-
-    Call it only from input functions. It goes through the `freeze_input`
-    checkpoint, so the DAG is re-evaluated once the file exists.
+    """Return the path of a frozen input, which `freeze_input` writes.
 
     Parameters
     ----------
@@ -57,7 +57,36 @@ def frozen(genome, name):
     str
         Path `<inputs_dir>/<genome>/<name>`.
     """
-    return checkpoints.freeze_input.get(genome=genome, name=name).output[0]
+    return f"{INPUTS}/{genome}/{name}"
+
+
+def frozen_list(genome, name):
+    """Return the path of a frozen list that input functions read.
+
+    These lists set which jobs exist, so they must be frozen before the DAG
+    is built: `snakemake freeze` writes them.
+
+    Parameters
+    ----------
+    genome : str
+        Genome key in `config["genomes"]`.
+    name : str
+        Frozen input name, a key of `config["sources"][genome]`.
+
+    Returns
+    -------
+    str
+        Path `<inputs_dir>/<genome>/<name>`.
+
+    Raises
+    ------
+    WorkflowError
+        If the list is missing.
+    """
+    path = frozen(genome, name)
+    if not os.path.exists(path):
+        raise WorkflowError(f"{path} is missing. Run `snakemake freeze` first.")
+    return path
 
 
 @cache
@@ -113,7 +142,7 @@ def hotspot_row(genome, row):
     list of str
         Experiment, peak file, signal file, then the other columns.
     """
-    return read_rows(frozen(genome, "Hotspot-List.txt"))[int(row) - 1]
+    return read_rows(frozen_list(genome, "Hotspot-List.txt"))[int(row) - 1]
 
 
 def hotspot_experiment(genome, peak):
@@ -131,6 +160,6 @@ def hotspot_experiment(genome, peak):
     str
         Experiment accession.
     """
-    rows = read_rows(frozen(genome, "Hotspot-List.txt"))
+    rows = read_rows(frozen_list(genome, "Hotspot-List.txt"))
     (exp,) = [r[0] for r in rows if r[1] == peak]
     return exp

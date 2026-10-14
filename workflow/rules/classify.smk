@@ -81,9 +81,9 @@ def master_rows(genome):
         Master cell list rows.
     """
     if genome in FROZEN_MASTER:
-        return read_rows(frozen(genome, "Master-Cell-List.txt"))
-    lists = tuple(frozen(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
-    return _master_rows(lists, frozen(genome, "TF-List.Cell-Type.txt"))
+        return read_rows(frozen_list(genome, "Master-Cell-List.txt"))
+    lists = tuple(frozen_list(genome, f"{mark}-List.txt") for mark in mcl.MARKS)
+    return _master_rows(lists, frozen_list(genome, "TF-List.Cell-Type.txt"))
 
 
 def cell_type_files(genome):
@@ -127,7 +127,7 @@ def cell_type_inputs(w):
         if row[2 * i] != mcl.MISSING
     }
     if row[0] != mcl.MISSING and row[-1] == "yes":
-        tf_list = frozen(w.genome, "TF-List.Cell-Type.txt")
+        tf_list = frozen_list(w.genome, "TF-List.Cell-Type.txt")
         inputs["tf_list"] = tf_list
         inputs["tf_peaks"] = [
             ancient(encode_file(r[0], r[1], "bed.gz"))

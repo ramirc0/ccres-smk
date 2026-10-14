@@ -19,7 +19,7 @@ workflow/
   Snakefile              includes the rules + rule all
   rules/
     common.smk           config, list readers, ENCODE path resolution, wildcards
-    inputs.smk           freeze_input checkpoint, download_encode
+    inputs.smk           freeze target, freeze_input, download_encode
     dhs.smk              steps 0-2
     tf.smk               step 3
     signal.smk           anchors, steps 4-5
@@ -87,6 +87,9 @@ never reach a run unnoticed. Two inputs are derived:
 mm10's step 7 freezes the release's May 2022 `Master-Cell-List.txt`. The mm10 mark lists were
 edited in 2025 and no longer rebuild it.
 
+The frozen lists set which jobs exist, so Snakemake reads them while it builds the DAG. A fresh
+`data/inputs/` therefore needs the `freeze` target before any other run.
+
 ENCODE files resolve to `<encode_root>/<exp>/<file>.<ext>`, a local mirror. A file missing there
 downloads from ENCODE's public S3 bucket to `data/encode/`. Its key and MD5 come from a snapshot of
 the ENCODE file report (`encode_metadata` in the config).
@@ -95,6 +98,7 @@ the ENCODE file report (`encode_metadata` in the config).
 
 ```bash
 cp config/config.yaml.template config/config.yaml  # then edit
+pixi run snakemake --profile profiles/slurm freeze # once, on a fresh data/inputs/
 pixi run snakemake -n -p --profile profiles/local  # dry run
 pixi run snakemake --profile profiles/local        # local
 pixi run snakemake --profile profiles/slurm        # zlurm
