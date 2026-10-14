@@ -132,3 +132,19 @@ the SLURM executor plugins. The rule env is a second pixi workspace, `workflow/e
 on. Its `oracle` env holds bedtools 2.30.0, the version of the release, for the unit tests only.
 An `onstart` hook installs the env before the first job, since parallel SLURM jobs would race to
 install it.
+
+## References
+
+Bonfield, James K., John Marshall, Petr Danecek, et al. 2021. “HTSlib: C Library for Reading/Writing High-Throughput Sequencing Data.” GigaScience 10 (2): giab007. https://doi.org/10.1093/gigascience/giab007.
+
+ENCODE Project Consortium, Jill E. Moore, Michael J. Purcaro, et al. 2020. “Expanded Encyclopaedias of DNA Elements in the Human and Mouse Genomes.” Nature 583 (7818): 699–710. https://doi.org/10.1038/s41586-020-2493-4.
+
+Kent, W. J., A. S. Zweig, G. Barber, A. S. Hinrichs, and D. Karolchik. 2010. “BigWig and BigBed: Enabling Browsing of Large Distributed Datasets.” Bioinformatics 26 (17): 2204–7. https://doi.org/10.1093/bioinformatics/btq351.
+
+Mölder, Felix, Kim Philipp Jablonski, Brice Letcher, et al. 2021. “Sustainable Data Analysis with Snakemake.” F1000Research 10 (January): 33. https://doi.org/10.12688/f1000research.29032.3.
+
+Moore, Jill E., Henry E. Pratt, Kaili Fan, et al. 2026. “An Expanded Registry of Candidate Cis-Regulatory Elements.” Nature, January 7. https://doi.org/10.1038/s41586-025-09909-9.
+
+Quinlan, Aaron R., and Ira M. Hall. 2010. “BEDTools: A Flexible Suite of Utilities for Comparing Genomic Features.” Bioinformatics 26 (6): 841–42. https://doi.org/10.1093/bioinformatics/btq033.
+
+Weng Lab. n.d. ENCODE-cCREs. Github. Accessed October 14, 2026. https://github.com/weng-lab/ENCODE-cCREs.
