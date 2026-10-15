@@ -1,4 +1,4 @@
-"""Differential tests of _bed against bedtools 2.30.0 and GNU sort under en_US."""
+"""Differential tests of _bed against bedtools 2.30.0 and GNU sort under the C locale."""
 
 import decimal
 from decimal import Decimal
@@ -235,10 +235,9 @@ def test_gnu_sort_bed(gnu_sort, seed):
 
 @pytest.mark.parametrize("seed", range(3))
 def test_gnu_sort_field_key(gnu_sort, seed):
-    """A `-k4,4` key is field 4 with its leading tab."""
+    """A `-k4,4` key sorts as field 4: its leading tab starts every key."""
     df = tied_lines(np.random.default_rng(seed), 3000)
-    keyed = df.with_columns(key="\t" + pl.col("name"))
-    order = _bed.gnu_sort(keyed, text_keys=["key"])
+    order = _bed.gnu_sort(df, text_keys=["name"])
     assert text(df[order]) == gnu_sort(["-k4,4"], text(df))
 
 

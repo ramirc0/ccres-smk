@@ -226,14 +226,14 @@ def drop_first(line):
 
 
 def sorted_lines(lines, text_key, numeric_key=None):
-    """Sort lines like `sort -k<text>,<text> [-k<num>,<num>n]` under en_US.UTF-8.
+    """Sort lines like `LC_ALL=C sort -k<text>,<text> [-k<num>,<num>n]`.
 
     Parameters
     ----------
     lines : list of str
         Tab-separated lines.
     text_key : int
-        0-based field compared by collation.
+        0-based field compared as text.
     numeric_key : int, optional
         0-based field compared as an integer.
 
@@ -254,10 +254,7 @@ def sorted_lines(lines, text_key, numeric_key=None):
         }
     )
     order = _bed.gnu_sort(
-        table,
-        text_keys=["text"],
-        numeric_keys=["number"] if numeric_key else [],
-        line="line",
+        table, text_keys=["text"], numeric_keys=["number"] if numeric_key else []
     )
     return [lines[i] for i in order]
 

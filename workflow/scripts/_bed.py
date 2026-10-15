@@ -1,41 +1,15 @@
-"""Exact BED text IO, GNU sort under en_US.UTF-8, and bedtools 2.30.0 interval ops.
+"""Exact BED text IO, GNU sort under the C locale, and bedtools 2.30.0 interval ops.
 
 Tables are polars DataFrames of string columns, read and written byte for byte.
 Interval ops take numpy arrays and reproduce bedtools 2.30.0. bedtools reads a
 zero-length interval [s, s) as [s - 1, s + 1), and so do these ops.
 
-Importing this module sets LC_COLLATE to en_US.UTF-8, the collation of the
-original run, and checks that glibc still orders lines the way it did.
+Text sorts by bytes, as `LC_ALL=C sort` does. The release sorted under
+en_US.UTF-8, which ignores blanks and punctuation on its first pass.
 """
-
-import locale
-from itertools import groupby, pairwise
 
 import numpy as np
 import polars as pl
-
-locale.setlocale(locale.LC_COLLATE, "en_US.UTF-8")
-
-# `LC_ALL=en_US.UTF-8 sort` order on glibc 2.39. Byte order differs.
-_COLLATION_PROBE = [
-    "chr10\t1\tx",
-    "chr1\t100\ta",
-    "chr1\t100\tB",
-    "chr1\t10\tx",
-    "chr1_KI270706v1_random\t1\tx",
-    "chr2\t3\tx",
-    "chrM\t1\tx",
-    "chrX\t5\tx",
-    "EH38D0001261",
-    "eh38d0001262",
-    "ENCFF042RIV-1",
-    "ENCFF042RIV-10",
-    "ENCFF042RIV-2",
-    "output.ENCFF002ZNX.1242",
-    "output.ENCFF002ZNX.242",
-]
-if sorted(_COLLATION_PROBE, key=locale.strxfrm) != _COLLATION_PROBE:
-    raise RuntimeError("en_US.UTF-8 collation differs from the original run's.")
 
 # Coordinates of one chromosome fit in 2**34. Adding chrom * 2**34 makes one
 # sorted axis of (chrom, position) pairs.
@@ -103,165 +77,38 @@ def write_tsv(df, path):
     lines(df).to_frame().write_csv(path, include_header=False, quote_style="never")
 
 
-def collation_ranks(values):
-    """Rank strings by en_US collation. Equal-collating strings share a rank.
+def gnu_sort(df, text_keys=(), numeric_keys=()):
+    """Order rows like `LC_ALL=C sort` with these keys, without -u.
 
-    en_US gives each digit and capital letter its own primary weight, in
-    ASCII order, and ignores none of them. Strings made only of these
-    characters, such as accessions, therefore collate as their bytes compare.
-    They skip strxfrm.
-
-    Parameters
-    ----------
-    values : polars.Series
-        Strings.
-
-    Returns
-    -------
-    numpy.ndarray
-        Dense int64 rank of each value.
-    """
-    if values.str.contains(r"^[0-9A-Z]+$").all():
-        return values.rank("dense").cast(pl.Int64).to_numpy()
-    distinct = values.unique().to_list()
-    keys = [locale.strxfrm(v) for v in distinct]
-    order = sorted(range(len(distinct)), key=keys.__getitem__)
-    rank_of = {}
-    rank = -1
-    for k, i in enumerate(order):
-        if k == 0 or keys[i] != keys[order[k - 1]]:
-            rank += 1
-        rank_of[distinct[i]] = rank
-    return values.replace_strict(rank_of, return_dtype=pl.Int64).to_numpy()
-
-
-def _tie_break(whole, order, tied_groups):
-    """Order each group of key-tied rows by whole-line collation.
-
-    Groups sort by bytes first, then strcoll checks each adjacent pair. A group
-    whose pairs all collate in order is sorted, since collation is transitive.
-    The rest sort by strxfrm. Both sorts are stable, so equal lines keep their
-    order.
-
-    Parameters
-    ----------
-    whole : polars.Series
-        Line of each row.
-    order : numpy.ndarray
-        Row indices sorted by the keys. Reordered in place.
-    tied_groups : list of tuple of int
-        `(start, stop)` positions in `order` of each group of tied rows.
-
-    Raises
-    ------
-    ValueError
-        If two distinct lines collate equal. GNU sort's order would then depend
-        on its merge.
-    """
-    starts, stops = np.array(tied_groups).T
-    sizes = stops - starts
-    group = np.repeat(np.arange(len(sizes)), sizes)
-    positions = np.repeat(starts - np.cumsum(sizes) + sizes, sizes)
-    positions += np.arange(len(positions))
-    tied_rows = order[positions]
-    tied = pl.DataFrame(
-        {"group": group, "row": tied_rows, "line": whole.gather(tied_rows)}
-    ).sort(["group", "line"], maintain_order=True)
-    order[positions] = tied["row"].to_numpy()
-    texts = tied["line"].to_list()
-    pairs = np.flatnonzero(group[1:] == group[:-1])
-    left = pairs.tolist()
-    collated = np.fromiter(
-        map(locale.strcoll, [texts[i] for i in left], [texts[i + 1] for i in left]),
-        dtype=np.int64,
-        count=len(left),
-    )
-    for i in pairs[collated == 0].tolist():
-        if texts[i] != texts[i + 1]:
-            raise ValueError(f"Distinct lines collate equal: {texts[i]!r}")
-    for g in np.unique(group[pairs[collated > 0]]).tolist():
-        begin, end = tied_groups[g]
-        rows = order[begin:end].tolist()
-        group_texts = whole.gather(rows).to_list()
-        keyed = sorted(
-            zip(map(locale.strxfrm, group_texts), group_texts, rows),
-            key=lambda item: item[0],
-        )
-        for (key, text, _), (next_key, next_text, _) in pairwise(keyed):
-            if key == next_key and text != next_text:
-                raise ValueError(f"Distinct lines collate equal: {text!r}")
-        order[begin:end] = [r for _, _, r in keyed]
-
-
-def gnu_sort(df, text_keys=(), numeric_keys=(), key_order=None, line=None):
-    r"""Order rows like GNU sort under en_US.UTF-8, without -u.
-
-    Rows compare by the keys in `key_order`, then by whole line with strcoll,
-    which is GNU sort's last-resort comparison.
+    Rows compare by the text keys, then the numeric keys, then by whole line,
+    GNU sort's last resort. Text compares by bytes. No field holds a tab, so
+    whole lines compare as their columns do, in order.
 
     Parameters
     ----------
     df : polars.DataFrame
         String columns. A row's line is its columns joined by tabs.
     text_keys : sequence of str
-        Columns compared by collation. GNU sort keys keep their leading
-        blanks, so a `-k4,4` key on tab-separated input is "\t" + field 4.
+        Columns compared as text.
     numeric_keys : sequence of str
         Integer columns compared by value (`-n`).
-    key_order : sequence of str, optional
-        Order of the keys. Defaults to the text keys, then the numeric keys.
-    line : str, optional
-        Column holding each row's whole line. Defaults to the columns joined
-        by tabs.
 
     Returns
     -------
     numpy.ndarray
         Row indices in sorted order.
     """
-    key_order = list(key_order or [*text_keys, *numeric_keys])
-    columns = {}
-    for name in text_keys:
-        columns[name] = collation_ranks(df[name])
-    for name in numeric_keys:
-        columns[name] = df[name].cast(pl.Int64, strict=True).to_numpy()
-    keys = [columns[name] for name in key_order]
-    order = np.lexsort(keys[::-1]) if keys else np.arange(df.height)
-    tied_groups = _tied_groups([k[order] for k in keys], df.height)
-    if tied_groups:
-        whole = df[line] if line else lines(df)
-        _tie_break(whole, order, tied_groups)
-    return order
-
-
-def _tied_groups(sorted_keys, n):
-    """Find runs of rows whose keys are all equal.
-
-    Parameters
-    ----------
-    sorted_keys : list of numpy.ndarray
-        Key arrays, in sorted row order.
-    n : int
-        Number of rows.
-
-    Returns
-    -------
-    list of tuple of int
-        `(start, stop)` of each run longer than one row.
-    """
-    if n < 2:
-        return []
-    same = np.ones(n - 1, dtype=bool)
-    for k in sorted_keys:
-        same &= k[1:] == k[:-1]
-    boundaries = np.flatnonzero(~same) + 1
-    starts = np.concatenate(([0], boundaries))
-    stops = np.concatenate((boundaries, [n]))
-    return [(int(a), int(b)) for a, b in zip(starts, stops) if b - a > 1]
+    numbers = [pl.col(name).cast(pl.Int64, strict=True) for name in numeric_keys]
+    return (
+        df.with_row_index("_row")
+        .sort([*text_keys, *numbers, *df.columns], maintain_order=True)
+        .get_column("_row")
+        .to_numpy()
+    )
 
 
 def sort_unique(line_list):
-    """Sort lines like `sort -u` under en_US.UTF-8.
+    """Sort lines like `LC_ALL=C sort -u`.
 
     Parameters
     ----------
@@ -271,21 +118,9 @@ def sort_unique(line_list):
     Returns
     -------
     list of str
-        Sorted lines. Of lines that collate equal, the first is kept.
-
-    Raises
-    ------
-    ValueError
-        If two distinct lines collate equal. GNU sort would drop one of them.
+        Distinct lines in byte order.
     """
-    keyed = sorted(((locale.strxfrm(s), s) for s in line_list), key=lambda p: p[0])
-    out = []
-    for _, run in groupby(keyed, key=lambda p: p[0]):
-        run = list(run)
-        if any(s != run[0][1] for _, s in run):
-            raise ValueError(f"Distinct lines collate equal: {run[0][1]!r}")
-        out.append(run[0][1])
-    return out
+    return sorted(set(line_list))
 
 
 def primary(chrom):

@@ -1,13 +1,14 @@
 """Step 2a: concatenate the processed DHSs and filter them.
 
-Port of the first part of 2_Create-rDHSs.sh. `cat output.*` concatenated the
-step 1 files in en_US glob order of their original names, output.<signal>.<row>.
-The filter keeps DHSs at least 150 bp wide, with signal at least the cutoff
-and FDR at most 0.001, on chromosomes without '_' other than chrEBV and chrM.
+Port of the first part of 2_Create-rDHSs.sh. The step 1 files are concatenated
+in hotspot list order. The script's `cat output.*` took the en_US glob order of
+their names, output.<signal>.<row>. create_rdhs sorts the filtered DHSs, so no
+rDHS depends on the order. The filter keeps DHSs at least 150 bp wide, with
+signal at least the cutoff and FDR at most 0.001, on chromosomes without '_'
+other than chrEBV and chrM.
 """
 
 import argparse
-import locale
 import shutil
 from pathlib import Path
 
@@ -38,8 +39,8 @@ def build_parser():
     return p
 
 
-def glob_order(hotspots):
-    """Return the step 1 file stems in the original glob order.
+def stems(hotspots):
+    """Return the step 1 file stems of a hotspot list, in list order.
 
     Parameters
     ----------
@@ -49,13 +50,10 @@ def glob_order(hotspots):
     Returns
     -------
     list of str
-        `<signal>-<row>` stems, ordered as en_US orders the original names,
-        `output.<signal>.<row>`.
+        `<signal>-<row>` of each row.
     """
     with open(hotspots) as f:
-        pairs = [(line.split("\t")[2], row) for row, line in enumerate(f, start=1)]
-    pairs.sort(key=lambda p: locale.strxfrm(f"output.{p[0]}.{p[1]}"))
-    return [f"{signal}-{row}" for signal, row in pairs]
+        return [f"{line.split('\t')[2]}-{row}" for row, line in enumerate(f, start=1)]
 
 
 def main(argv=None):
@@ -68,7 +66,7 @@ def main(argv=None):
     """
     args = build_parser().parse_args(argv)
     with open(args.all, "wb") as out:
-        for stem in glob_order(args.hotspots):
+        for stem in stems(args.hotspots):
             with open(Path(args.processed, f"{stem}.bed"), "rb") as f:
                 shutil.copyfileobj(f, out, 1 << 24)
 

@@ -26,7 +26,7 @@ workflow/
     signal.smk           anchors, steps 4-5
     classify.smk         steps 6-8
   scripts/               argparse scripts, each with build_parser() + main()
-    _bed.py              exact BED text IO, en_US GNU sort, bedtools 2.30.0 interval ops
+    _bed.py              exact BED text IO, byte-order sort, bedtools 2.30.0 interval ops
     _registry.py         representative-peak loop, region accessions
     _zscore.py           glibc's non-FMA log, exact sums
     _cres.py             selections by key and z-score, the TSS/proximal/distal split

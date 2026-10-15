@@ -50,7 +50,7 @@ def build_parser():
 
 
 def gnu_sorted(df):
-    """Sort a BED table like `sort -k1,1 -k2,2n` under en_US.UTF-8.
+    """Sort a BED table like `LC_ALL=C sort -k1,1 -k2,2n`.
 
     Parameters
     ----------

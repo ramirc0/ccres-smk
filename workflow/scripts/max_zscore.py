@@ -1,14 +1,13 @@
 """Step 5: the highest z-score of each anchor across one mark's experiments.
 
 Port of 5_Determine-Max-Zscores.sh with select-max-zscore.py. Rows whose file
-is NA have no signal file. The files are read in the en_US glob order of their
-names. The first seeds each anchor's
+is NA have no signal file. The files are read in byte order of their names.
+The first seeds each anchor's
 value, and a later value replaces it only if it is greater. Rows keep the
 first file's order. Values print with Python's str().
 """
 
 import argparse
-import locale
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -61,7 +60,7 @@ def main(argv=None):
     with open(args.mark_list) as f:
         rows = [line.split("\t") for line in f if line.strip()]
     names = [f"{exp}-{acc}.txt" for exp, acc, *_ in rows if acc != "NA"]
-    paths = [Path(args.signal, n) for n in sorted(names, key=locale.strxfrm)]
+    paths = [Path(args.signal, n) for n in sorted(names)]
 
     with ThreadPoolExecutor(args.threads) as pool:
         tables = pool.map(read_z, paths)

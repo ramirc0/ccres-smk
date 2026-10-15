@@ -1,8 +1,8 @@
 """Step 1: average one experiment's DNase signal over each of its DHSs.
 
-Port of 1_Process-DHSs.sh. DHSs are named `<peak>-<line>`, sorted by name with
-`sort -k4,4`, and averaged with bigWigAverageOverBed. Its output, sorted with
-`sort -k1,1`, is pasted next to them by position. Column 6 is the tool's mean0
+Port of 1_Process-DHSs.sh. DHSs are named `<peak>-<line>`, sorted by name, and
+averaged with bigWigAverageOverBed. Its output, sorted by name too, is pasted
+next to them by position. Column 6 is the tool's mean0
 text, unchanged.
 """
 
@@ -52,9 +52,7 @@ def main(argv=None):
         ),
         "fdr",
     )
-    # A -k4,4 key keeps the tab before field 4.
-    named = named[_bed.gnu_sort(named.with_columns(key="\t" + pl.col("name")), ["key"])]
-    named = named.select("chrom", "start", "end", "name", "fdr")
+    named = named[_bed.gnu_sort(named, ["name"])]
 
     with tempfile.TemporaryDirectory() as tmp:
         bed, tab = Path(tmp, "new.bed"), Path(tmp, "out.tab")

@@ -54,14 +54,14 @@ def bedtools():
 
 @pytest.fixture
 def gnu_sort():
-    """Run GNU sort under en_US.UTF-8, as the original run did.
+    """Run GNU sort under the C locale, which compares bytes.
 
     Returns
     -------
     callable
         Takes sort arguments and the input text, returns sorted text.
     """
-    return lambda args, text: run(["sort", *args], text, {"LC_ALL": "en_US.UTF-8"})
+    return lambda args, text: run(["sort", *args], text, {"LC_ALL": "C"})
 
 
 ORIGINAL = Path(

@@ -2,7 +2,7 @@ r"""Step 4a: widen the anchors for one signal width and run them through `sort -
 
 Port of the first pipe of Toolkit/Retrieve-Signal.sh:
 `printf "%s\t%.0f\t%.0f\t%s\n", $1, $2 - width, $3 + width, $4`, starts below 0
-set to 0, then `sort -u` under en_US.UTF-8. Every experiment of a mark averages
+set to 0, then `sort -u`, here in byte order. Every experiment of a mark averages
 its signal over this one file.
 """
 
