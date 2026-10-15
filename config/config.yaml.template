@@ -1,6 +1,6 @@
 outdir: data/results
 pixi_env: default
-run_id: v7               # outputs go under <outdir>/<run_id>/<genome>/; override per run
+run_id: default          # outputs go under <outdir>/<run_id>/<genome>/; override per run
 
 inputs_dir: data/inputs-2026-10-09           # frozen inputs, checked against config/inputs.b3
 encode_root: /data/projects/encode/data      # ENCODE mirror, <exp>/<file>.<ext>
