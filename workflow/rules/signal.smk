@@ -114,6 +114,7 @@ rule max_zscore:
         f"{OUTDIR}/{{genome}}/{{genome}}-{{mark}}-maxZ.parquet",
     params:
         signal=lambda w: f"{OUTDIR}/{w.genome}/signal-output/{w.mark}",
+    threads: 8
     log:
         f"{LOGDIR}/max_zscore/{{genome}}/{{mark}}.txt",
     benchmark:
@@ -127,6 +128,7 @@ rule max_zscore:
         python {workflow.basedir:q}/scripts/max_zscore.py \
             --mark-list {input.mark_list:q} \
             --signal {params.signal:q} \
+            --threads {threads} \
             --output {output:q}
 
         sync {output:q}
