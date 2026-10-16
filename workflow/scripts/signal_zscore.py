@@ -14,12 +14,8 @@ order. The log is glibc's, through polars.
 
 import argparse
 import math
-import subprocess
-import tempfile
-from pathlib import Path
 
 import _bed
-import numpy as np
 import polars as pl
 
 
@@ -32,26 +28,10 @@ def build_parser():
         Parser for the signal_zscore.py flags.
     """
     p = argparse.ArgumentParser(description="Log z-score one signal track.")
-    p.add_argument("--anchors", required=True, help="Widened anchor BED.")
+    p.add_argument("--anchors", required=True, help="Widened anchor Parquet.")
     p.add_argument("--bigwig", required=True, help="Signal bigWig.")
-    p.add_argument("-o", "--output", required=True, help="Z-score table to write.")
+    p.add_argument("-o", "--output", required=True, help="Z-score Parquet to write.")
     return p
-
-
-def ranks(z):
-    """Rank values, highest first. Tied values share a rank.
-
-    Parameters
-    ----------
-    z : numpy.ndarray
-        Values as float64.
-
-    Returns
-    -------
-    numpy.ndarray
-        Rank of each value, 1 + the number of larger values, int64.
-    """
-    return np.searchsorted(np.sort(-z), -z, side="left") + 1
 
 
 def score(out):
@@ -60,37 +40,29 @@ def score(out):
     Parameters
     ----------
     out : polars.DataFrame
-        The tool's string columns: name, size, covered, sum, mean0 and mean.
+        The tool's columns: name, size, covered, sum, mean0 and mean.
 
     Returns
     -------
     polars.DataFrame
-        Name, z, signal and rank of each anchor, in anchor name order.
+        Name, z, signal and rank of each anchor, in name order. Rank is 1 +
+        the number of larger z-scores.
     """
-    mean0 = _bed.python_floats(out["mean0"])
-    zero = (mean0 == 0) | (_bed.python_floats(out["covered"]) == 0)
-    logs = pl.Series(mean0[~zero]).log().to_numpy()
-    mean = math.fsum(logs.tolist()) / len(logs)
+    zero = (pl.col("mean0") == 0) | (pl.col("covered") == 0)
+    logs = out.filter(~zero)["mean0"].log()
+    mean = math.fsum(logs.to_list()) / len(logs)
     deviation = logs - mean
-    sd = math.sqrt(math.fsum((deviation * deviation).tolist()) / len(logs))
-    z = np.full(len(mean0), -np.inf)
-    z[~zero] = (logs - mean) / sd
-    if not np.all(np.isfinite(z[~zero])):
+    sd = math.sqrt(math.fsum((deviation * deviation).to_list()) / len(logs))
+    if not (deviation / sd).is_finite().all():
         raise ValueError("Non-finite z-score.")
-
-    z_text = [repr(v) for v in z.tolist()]
-    signal_text = [
-        "0" if is_zero else repr(v) for v, is_zero in zip(mean0.tolist(), zero)
-    ]
-    table = pl.DataFrame(
-        {
-            "name": out["name"],
-            "z": z_text,
-            "signal": signal_text,
-            "rank": ranks(z).astype(str).tolist(),
-        }
-    )
-    return table[_bed.gnu_sort(table, ["name"])]
+    table = out.select(
+        "name",
+        z=pl.when(zero)
+        .then(float("-inf"))
+        .otherwise((pl.col("mean0").log() - mean) / sd),
+        signal=pl.when(zero).then(0.0).otherwise("mean0"),
+    ).with_columns(rank=pl.col("z").rank("min", descending=True).cast(pl.Int64))
+    return table.sort("name")
 
 
 def main(argv=None):
@@ -102,13 +74,8 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    with tempfile.TemporaryDirectory() as tmp:
-        tab = Path(tmp, "out2")
-        subprocess.run(
-            ["bigWigAverageOverBed", args.bigwig, args.anchors, tab], check=True
-        )
-        out = _bed.read_tsv(tab, ["name", "size", "covered", "sum", "mean0", "mean"])
-    _bed.write_tsv(score(out), args.output)
+    anchors = pl.read_parquet(args.anchors).rename({"accession": "name"})
+    _bed.write_parquet(score(_bed.bigwig_averages(anchors, args.bigwig)), args.output)
 
 
 if __name__ == "__main__":

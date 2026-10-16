@@ -17,8 +17,8 @@ import _bed
 import _registry
 import polars as pl
 
-COLUMNS = [f"c{i}" for i in range(1, 15)]
 MIN_EXPERIMENTS = 5
+RDHS = {"chrom": pl.String, "start": pl.Int64, "end": pl.Int64, "accession": pl.String}
 
 
 def build_parser():
@@ -30,44 +30,26 @@ def build_parser():
         Parser for the tf_clusters.py flags.
     """
     p = argparse.ArgumentParser(description="Curate TF clusters.")
-    p.add_argument("--rpeaks", required=True, help="tmp-rPeaks.")
-    p.add_argument("--summits", required=True, help="tmp-summits.")
+    p.add_argument("--rpeaks", required=True, help="rPeak Parquet.")
+    p.add_argument("--peaks", required=True, help="Peak Parquet, with summits.")
     p.add_argument("--rdhs", required=True, help="rDHS BED of the genome.")
     p.add_argument("--genome", required=True, help="hg38 or mm10.")
-    p.add_argument("--clusters", required=True, help="TF-Clusters.txt to write.")
-    p.add_argument("--no-overlap", required=True, help="tmp-no-overlap to write.")
-    p.add_argument("--summary", required=True, help="rTFBS-Summary.txt to write.")
-    p.add_argument("--rtfbs", required=True, help="rTFBS.bed to write.")
+    p.add_argument("--clusters", required=True, help="TF clusters to write.")
+    p.add_argument("--no-overlap", required=True, help="Clusters off rDHSs to write.")
+    p.add_argument("--summary", required=True, help="Accessioned clusters to write.")
+    p.add_argument("--rtfbs", required=True, help="rTFBS BED to write.")
     return p
 
 
-def intervals(df, codes, start="c2", end="c3"):
-    """Return the interval arrays of a table.
-
-    Parameters
-    ----------
-    df : polars.DataFrame
-        String columns.
-    codes : numpy.ndarray
-        Chromosome code of each row.
-    start, end : str
-        Coordinate columns.
-
-    Returns
-    -------
-    tuple of numpy.ndarray
-        Codes, starts and ends.
-    """
-    return codes, df[start].cast(pl.Int64).to_numpy(), df[end].cast(pl.Int64).to_numpy()
-
-
-def clusters(rpeaks, summits):
+def clusters(rpeaks, peaks):
     """Collect the summits of each rPeak and keep those with >= 5 experiments.
 
     Parameters
     ----------
-    rpeaks, summits : polars.DataFrame
-        14 string columns each.
+    rpeaks : polars.DataFrame
+        Representative peaks.
+    peaks : polars.DataFrame
+        All peaks, with summit, exp, target and biosample.
 
     Returns
     -------
@@ -75,41 +57,36 @@ def clusters(rpeaks, summits):
         Chrom, start, end, name, targets, biosamples, experiments and the
         experiment count, in rPeak order.
     """
-    rp_codes, su_codes = _bed.shared_codes(rpeaks["c1"], summits["c1"])
-    ia, ib, _ = _bed.overlap_pairs(
-        intervals(rpeaks, rp_codes), intervals(summits, su_codes)
+    summits = peaks.select(
+        "chrom",
+        "exp",
+        "target",
+        "biosample",
+        start="summit",
+        end=pl.col("summit") + 1,
     )
-    hits = pl.DataFrame(
-        {
-            "row": ia,
-            "exp": summits["c11"].gather(ib),
-            "target": summits["c12"].gather(ib),
-            "cell": summits["c13"].gather(ib),
-        }
+    pairs = _bed.overlap_pairs(rpeaks, summits)
+    hits = summits.select("exp", "target", "biosample")[pairs["b"]].with_columns(
+        row=pairs["a"]
     )
     joined = (
-        hits.group_by("row", maintain_order=True)
+        hits.group_by("row")
         .agg(
             *(
-                pl.col(c).unique().sort().str.join(";").alias(c)
-                for c in ("target", "cell", "exp")
+                pl.col(c).unique().sort().str.join(";")
+                for c in ("target", "biosample", "exp")
             ),
             count=pl.col("exp").n_unique(),
         )
         .filter(pl.col("count") >= MIN_EXPERIMENTS)
+        .sort("row")
     )
-    rows = joined["row"].to_numpy()
-    return pl.DataFrame(
-        {
-            "chrom": rpeaks["c1"].gather(rows),
-            "start": rpeaks["c2"].gather(rows),
-            "end": rpeaks["c3"].gather(rows),
-            "name": rpeaks["c14"].gather(rows),
-            "target": joined["target"],
-            "cell": joined["cell"],
-            "exp": joined["exp"],
-            "count": joined["count"].cast(pl.String),
-        }
+    return pl.concat(
+        [
+            rpeaks.select(*_bed.COORDS, "name")[joined["row"]],
+            joined.drop("row"),
+        ],
+        how="horizontal",
     )
 
 
@@ -123,27 +100,19 @@ def main(argv=None):
     """
     args = build_parser().parse_args(argv)
     tf = clusters(
-        _bed.read_tsv(args.rpeaks, COLUMNS), _bed.read_tsv(args.summits, COLUMNS)
+        pl.read_parquet(args.rpeaks),
+        pl.read_parquet(
+            args.peaks, columns=["chrom", "summit", "exp", "target", "biosample"]
+        ),
     )
-    _bed.write_tsv(tf, args.clusters)
+    _bed.write_parquet(tf, args.clusters)
 
-    rdhs = _bed.read_tsv(args.rdhs, ["chrom", "start", "end", "accession"])
-    tf_codes, rdhs_codes = _bed.shared_codes(tf["chrom"], rdhs["chrom"])
-    off = ~_bed.overlaps_any(
-        intervals(tf, tf_codes, "start", "end"),
-        intervals(rdhs, rdhs_codes, "start", "end"),
-    )
-    lone = tf.filter(off)
-    _bed.write_tsv(lone, args.no_overlap)
+    lone = tf.filter(~_bed.overlaps_any(tf, _bed.read_bed(args.rdhs, RDHS)))
+    _bed.write_parquet(lone, args.no_overlap)
 
-    regions = lone.select("chrom", "start", "end").iter_rows()
-    summary = lone.with_columns(
-        accession=pl.Series(
-            _registry.accessions(regions, args.genome, "TF"), dtype=pl.String
-        )
-    )
-    _bed.write_tsv(summary, args.summary)
-    _bed.write_tsv(summary.select("chrom", "start", "end", "accession"), args.rtfbs)
+    summary = lone.with_columns(_registry.accessions(lone, args.genome, "TF"))
+    _bed.write_parquet(summary, args.summary)
+    _bed.write_bed(summary.select(*_bed.COORDS, "accession"), args.rtfbs)
 
 
 if __name__ == "__main__":

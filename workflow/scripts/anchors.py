@@ -1,4 +1,4 @@
-"""Anchors: rDHSs and rTFBSs together, sorted with `sort -k1,1 -k2,2n`.
+"""Anchors: rDHSs and rTFBSs together, sorted by position.
 
 The original repository has no script for this step. Its output equals
 `cat rDHS-Filtered.bed rTFBS.bed | sort -k1,1 -k2,2n`.
@@ -9,7 +9,12 @@ import argparse
 import _bed
 import polars as pl
 
-COLUMNS = ["chrom", "start", "end", "accession"]
+ANCHOR = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "accession": pl.String,
+}
 
 
 def build_parser():
@@ -23,7 +28,7 @@ def build_parser():
     p = argparse.ArgumentParser(description="Combine rDHSs and rTFBSs.")
     p.add_argument("--rdhs", required=True, help="rDHS BED.")
     p.add_argument("--rtfbs", required=True, help="rTFBS BED.")
-    p.add_argument("-o", "--output", required=True, help="Anchor BED to write.")
+    p.add_argument("-o", "--output", required=True, help="Anchor Parquet to write.")
     return p
 
 
@@ -37,10 +42,9 @@ def main(argv=None):
     """
     args = build_parser().parse_args(argv)
     anchors = pl.concat(
-        [_bed.read_tsv(args.rdhs, COLUMNS), _bed.read_tsv(args.rtfbs, COLUMNS)]
+        [_bed.read_bed(args.rdhs, ANCHOR), _bed.read_bed(args.rtfbs, ANCHOR)]
     )
-    order = _bed.gnu_sort(anchors, text_keys=["chrom"], numeric_keys=["start"])
-    _bed.write_tsv(anchors[order], args.output)
+    _bed.write_parquet(anchors.sort(anchors.columns), args.output)
 
 
 if __name__ == "__main__":

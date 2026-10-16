@@ -49,7 +49,7 @@ set-resources:              # tune from benchmarks/ TSVs after a real run
     runtime: 120m
   tf_peaks:
     slurm_partition: 4hours
-    mem_mb: 16000 * attempt
+    mem_mb: 48000 * attempt
     runtime: 120m
   tf_rpeaks:
     slurm_partition: 4hours

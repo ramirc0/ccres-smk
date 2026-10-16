@@ -7,14 +7,15 @@ CCRES = [
     ("chr1", 5000, 5150, "EH38D2", "EH38E2", "PLS"),
     ("chr1", 9000, 9200, "EH38D3", "EH38E3", "pELS"),
 ]
-# Position, strand and gene of each TSS on chr1.
+# 0-based base, strand and gene of each TSS on chr1.
 TSS = [
-    (875, "-", "far_left"),
-    (1000, "+", "start"),
-    (1200, "-", "end"),
+    (874, "-", "far_left"),
+    (1000, "+", "first_base"),
+    (1199, "-", "last_base"),
     (1300, "+", "center_plus_200"),
     (1301, "+", "center_plus_201"),
     (4875, "+", "center_minus_200"),
+    (4874, "+", "center_minus_201"),
     (5250, "-", "center_plus_175"),
     (5300, "+", "center_plus_225"),
     (9100, "+", "on_pels"),
@@ -39,7 +40,7 @@ def test_every_tss_within_200_bp_of_the_center(tmp_path):
     write(tmp_path / "ccres.bed", CCRES)
     write(
         tmp_path / "tss.bed",
-        [("chr1", p, p, f"T{i}", ".", s, g) for i, (p, s, g) in enumerate(TSS)],
+        [("chr1", p + 1, p + 1, f"T{i}", ".", s, g) for i, (p, s, g) in enumerate(TSS)],
     )
     pls_genes.main(
         [
@@ -53,8 +54,8 @@ def test_every_tss_within_200_bp_of_the_center(tmp_path):
     )
     assert (tmp_path / "genes.txt").read_text().splitlines() == [
         "EH38E1\tcenter_plus_200",
-        "EH38E1\tend",
-        "EH38E1\tstart",
+        "EH38E1\tfirst_base",
+        "EH38E1\tlast_base",
         "EH38E2\tcenter_minus_200",
         "EH38E2\tcenter_plus_175",
     ]

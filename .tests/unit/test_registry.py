@@ -8,7 +8,9 @@ import numpy as np
 import polars as pl
 import pytest
 
-SIGNALS = ["1.5", "1.50", "0.75", "2", "0.3", "1.18826"]
+SIGNALS = [1.5, 0.75, 2.0, 0.3, 1.18826]
+REGION = {"chrom": pl.String, "start": pl.Int64, "end": pl.Int64}
+PREVIOUS = {**REGION, "accession": pl.String, "version": pl.String}
 
 
 def peaks(rng, n, duplicate_names=False):
@@ -26,21 +28,21 @@ def peaks(rng, n, duplicate_names=False):
     Returns
     -------
     polars.DataFrame
-        Columns chrom, start, end, name, fdr, signal in GNU sort order.
+        Columns chrom, start, end, name, fdr, signal, sorted.
     """
     start = rng.integers(0, 30000, n)
     ids = rng.integers(0, n // 4, n) if duplicate_names else np.arange(n)
     df = pl.DataFrame(
         {
             "chrom": rng.choice(["chr1", "chr2", "chr10"], n).tolist(),
-            "start": start.astype(str).tolist(),
-            "end": (start + rng.integers(150, 351, n)).astype(str).tolist(),
+            "start": start,
+            "end": start + rng.integers(150, 351, n),
             "name": [f"ENCFF{i % 7:03d}AAA-{i}" for i in ids],
-            "fdr": ["1e-05"] * n,
-            "signal": rng.choice(SIGNALS, n).tolist(),
+            "fdr": [1e-05] * n,
+            "signal": rng.choice(SIGNALS, n),
         }
     )
-    return df[_bed.gnu_sort(df, text_keys=["chrom"], numeric_keys=["start"])]
+    return df.sort("chrom", "start", "end", "name")
 
 
 def original_loop(df, tmp_path, bedtools, toolkit):
@@ -67,7 +69,7 @@ def original_loop(df, tmp_path, bedtools, toolkit):
         tmp_path / "merge",
         tmp_path / "rPeaks",
     )
-    _bed.write_tsv(df, sorted_path)
+    _bed.write_bed(df, sorted_path)
     rpeaks.write_text("")
     while sorted_path.stat().st_size:
         merge.write_text(
@@ -104,15 +106,8 @@ def original_loop(df, tmp_path, bedtools, toolkit):
 def test_representative_peaks(bedtools, original, tmp_path, seed, duplicate_names):
     """representative_peaks reproduces the original loop, ties and shared names included."""
     df = peaks(np.random.default_rng(seed), 1500, duplicate_names)
-    codes = _bed.chrom_codes(df["chrom"])
-    picks = _registry.representative_peaks(
-        codes,
-        df["start"].cast(pl.Int64).to_numpy(),
-        df["end"].cast(pl.Int64).to_numpy(),
-        np.array([float(s) for s in df["signal"]]),
-        df["name"],
-    )
-    ours = "".join(f"{line}\n" for line in _bed.lines(df[picks]).to_list())
+    picks = _registry.representative_peaks(df, "signal", "name")
+    ours = picks.write_csv(separator="\t", include_header=False)
     assert ours == original_loop(df, tmp_path, bedtools, original)
 
 
@@ -120,23 +115,24 @@ def test_accessions(original, tmp_path):
     """Accessions reproduces make-region-accession.py without key collisions."""
     rng = np.random.default_rng(0)
     start = rng.integers(1, 5000, 400)
-    regions = [("chr1", str(s), str(s + 200)) for s in start]
-    regions += [("chr1", "10033", "10250")]
+    regions = [("chr1", int(s), int(s) + 200) for s in start]
+    regions += [("chr1", 10033, 10250)]
     previous = [
-        ("chr1", str(s), str(s + 200), f"EH37D{i:07d}", "V1")
+        ("chr1", int(s), int(s) + 200, f"EH37D{i:07d}", "V1")
         for i, s in enumerate(start[::3])
     ]
     previous += [
-        ("chr1", "10033", "10250", "EH37D0999999", "V2"),
-        ("chr1", "12", "3", "EH37D0000007", "V3"),
+        ("chr1", 10033, 10250, "EH37D0999999", "V2"),
+        ("chr1", 12, 3, "EH37D0000007", "V3"),
     ]
     previous += [previous[0][:3] + ("EH37D0000123", "V3")]
+    regions = pl.DataFrame(regions, schema=REGION, orient="row")
+    previous = pl.DataFrame(previous, schema=PREVIOUS, orient="row")
     region_path, previous_path = tmp_path / "regions.bed", tmp_path / "previous.bed"
-    region_path.write_text("".join("\t".join(r) + "\n" for r in regions))
-    previous_path.write_text("".join("\t".join(r) + "\n" for r in previous))
+    _bed.write_bed(regions, region_path)
+    _bed.write_bed(previous, previous_path)
 
-    known = _registry.previous_accessions(previous, "rDHS")
-    ours = _registry.accessions(regions, "hg38", "rDHS", known)
+    ours = _registry.accessions(regions, "hg38", "rDHS", previous)
     expected = subprocess.run(
         [
             "python3",
@@ -150,18 +146,26 @@ def test_accessions(original, tmp_path):
         text=True,
         check=True,
     ).stdout
-    assert "".join("\t".join(r) + f"\t{a}\n" for r, a in zip(regions, ours)) == expected
+    ours = regions.with_columns(ours).write_csv(separator="\t", include_header=False)
+    assert ours == expected
 
 
 def test_accessions_key_on_coordinates():
     """Reuse a previous accession only for the same chrom, start and end."""
-    previous = [
-        ("chr1", "10033", "10250", "EH37D0999999", "V2"),
-        ("chr1", "12", "3", "EH37D0000007", "V3"),
-    ]
-    regions = [("chr1", "1003", "310250"), ("chr11", "2", "3"), ("chr1", "12", "3")]
-    known = _registry.previous_accessions(previous, "rDHS")
-    assert _registry.accessions(regions, "hg38", "rDHS", known) == [
+    previous = pl.DataFrame(
+        [
+            ("chr1", 10033, 10250, "EH37D0999999", "V2"),
+            ("chr1", 12, 3, "EH37D0000007", "V3"),
+        ],
+        schema=PREVIOUS,
+        orient="row",
+    )
+    regions = pl.DataFrame(
+        [("chr1", 1003, 310250), ("chr11", 2, 3), ("chr1", 12, 3)],
+        schema=REGION,
+        orient="row",
+    )
+    assert _registry.accessions(regions, "hg38", "rDHS", previous).to_list() == [
         "EH38D1000000",
         "EH38D1000001",
         "EH38D0000007",

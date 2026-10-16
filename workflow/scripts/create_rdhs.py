@@ -1,9 +1,9 @@
 """Step 2b: pick representative DHSs, accession them and keep the cDHS-supported ones.
 
-Port of the rest of 2_Create-rDHSs.sh. The filtered DHSs are sorted with
-`sort -k1,1 -k2,2n` and reduced to representative DHSs (rDHSs) by the
-merge, pick and intersect loop. The sorted rDHSs get accessions, reusing
-those of identical earlier rDHSs. Each rDHS then falls in one cDHS class:
+Port of the rest of 2_Create-rDHSs.sh. The filtered DHSs are sorted by
+position and reduced to representative DHSs (rDHSs) by the merge, pick and
+intersect loop. The sorted rDHSs get accessions, reusing those of identical
+earlier rDHSs. Each rDHS then falls in one cDHS class:
 
 - complete: it covers a whole cDHS (`intersect -F 1 -u`).
 - none: it overlaps no cDHS.
@@ -11,21 +11,32 @@ those of identical earlier rDHSs. Each rDHS then falls in one cDHS class:
 - less: the rest. It is kept if its signal is at least the 90th percentile of
   the none class's signal.
 
-The summary is the kept less rDHSs and the 135 rDHSs, each run through
-`sort -u`, followed by the complete rDHSs.
+The summary holds the kept less, the 135 and the complete rDHSs, sorted by
+position. The original printed the three classes one after another.
 """
 
 import argparse
 
 import _bed
 import _registry
-import numpy as np
 import polars as pl
 
-COLUMNS = ["chrom", "start", "end", "name", "fdr", "signal"]
-CDHS_COLUMNS = [f"c{i}" for i in range(1, 12)]
+ORDER = [*_bed.COORDS, "name"]
+PREVIOUS = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "accession": pl.String,
+    "version": pl.String,
+}
+CDHS = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    **{f"c{i}": pl.String for i in range(4, 12)},
+}
 MIN_OVERLAP = 135
-PERCENTILE = 90
+PERCENTILE = 0.9
 
 
 def build_parser():
@@ -37,7 +48,7 @@ def build_parser():
         Parser for the create_rdhs.py flags.
     """
     p = argparse.ArgumentParser(description="Create rDHSs from filtered DHSs.")
-    p.add_argument("--filtered", required=True, help="Filtered DHS BED.")
+    p.add_argument("--filtered", required=True, help="Filtered DHS Parquet.")
     p.add_argument("--previous", required=True, help="Previous rDHSs, gzipped BED.")
     p.add_argument("--cdhs", required=True, help="Altius consensus DHS BED.")
     p.add_argument("--genome", required=True, help="hg38 or mm10.")
@@ -49,87 +60,45 @@ def build_parser():
     return p
 
 
-def gnu_sorted(df):
-    """Sort a BED table like `LC_ALL=C sort -k1,1 -k2,2n`.
+def cdhs_classes(rdhs, cdhs):
+    """Measure each rDHS against the cDHSs.
 
     Parameters
     ----------
-    df : polars.DataFrame
-        String columns, chrom and start among them.
+    rdhs, cdhs : polars.DataFrame
+        Tables with chrom, start and end.
 
     Returns
     -------
     polars.DataFrame
-        Sorted rows.
+        Per rDHS: whether it covers a whole cDHS, whether it overlaps one, and
+        its largest overlap in bp.
     """
-    return df[_bed.gnu_sort(df, text_keys=["chrom"], numeric_keys=["start"])]
-
-
-def coordinates(df, codes):
-    """Return the interval arrays of a table.
-
-    Parameters
-    ----------
-    df : polars.DataFrame
-        Table with start and end columns.
-    codes : numpy.ndarray
-        Chromosome code of each row.
-
-    Returns
-    -------
-    tuple of numpy.ndarray
-        Codes, starts and ends.
-    """
+    pairs = _bed.overlap_pairs(rdhs, cdhs)
+    a = rdhs.select("start", "end")[pairs["a"]]
+    b = cdhs.select(b_start="start", b_end="end")[pairs["b"]]
+    measured = (
+        pl.concat([pairs.select(row="a"), a, b], how="horizontal")
+        .group_by("row")
+        .agg(
+            covers=(
+                (pl.col("b_start") >= pl.col("start"))
+                & (pl.col("b_end") <= pl.col("end"))
+            ).any(),
+            overlap=(
+                pl.min_horizontal("end", "b_end")
+                - pl.max_horizontal("start", "b_start")
+            ).max(),
+        )
+    )
     return (
-        codes,
-        df["start"].cast(pl.Int64).to_numpy(),
-        df["end"].cast(pl.Int64).to_numpy(),
-    )
-
-
-def representatives(dhs):
-    """Reduce sorted DHSs to representative DHSs.
-
-    Parameters
-    ----------
-    dhs : polars.DataFrame
-        DHSs in `sort -k1,1 -k2,2n` order.
-
-    Returns
-    -------
-    polars.DataFrame
-        Representative DHSs in the order the loop appends them.
-    """
-    picks = _registry.representative_peaks(
-        *coordinates(dhs, _bed.chrom_codes(dhs["chrom"])),
-        _bed.python_floats(dhs["signal"]),
-        dhs["name"],
-    )
-    return dhs[picks]
-
-
-def accessioned(rdhs, previous_path, genome):
-    """Append rDHS accessions, as make-region-accession.py does.
-
-    Parameters
-    ----------
-    rdhs : polars.DataFrame
-        Sorted rDHSs.
-    previous_path : str
-        Previous rDHSs, gzipped BED of chrom, start, end, accession, version.
-    genome : str
-        Genome, hg38 or mm10.
-
-    Returns
-    -------
-    polars.DataFrame
-        The rDHSs with an accession column.
-    """
-    previous = _bed.read_tsv(previous_path, ["chrom", "start", "end", "acc", "version"])
-    known = _registry.previous_accessions(previous.iter_rows(), "rDHS")
-    regions = rdhs.select("chrom", "start", "end").iter_rows()
-    return rdhs.with_columns(
-        accession=pl.Series(_registry.accessions(regions, genome, "rDHS", known))
+        rdhs.with_row_index("row")
+        .join(measured, on="row", how="left", maintain_order="left")
+        .select(
+            covers=pl.col("covers").fill_null(False),
+            overlaps=pl.col("overlap").is_not_null(),
+            overlap=pl.col("overlap").fill_null(0),
+        )
     )
 
 
@@ -142,47 +111,32 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    dhs = gnu_sorted(_bed.read_tsv(args.filtered, COLUMNS))
-    zz = accessioned(gnu_sorted(representatives(dhs)), args.previous, args.genome)
-    _bed.write_tsv(zz, args.prestam)
+    dhs = pl.read_parquet(args.filtered).sort(ORDER)
+    rdhs = _registry.representative_peaks(dhs, "signal", "name").sort(ORDER)
+    previous = _bed.read_bed(args.previous, PREVIOUS)
+    zz = rdhs.with_columns(_registry.accessions(rdhs, args.genome, "rDHS", previous))
+    _bed.write_parquet(zz, args.prestam)
 
-    cdhs = _bed.read_tsv(args.cdhs, CDHS_COLUMNS)
-    zz_codes, cdhs_codes = _bed.shared_codes(zz["chrom"], cdhs["c1"])
-    cdhs_iv = coordinates(cdhs.rename({"c2": "start", "c3": "end"}), cdhs_codes)
-    complete = _bed.contains_any(coordinates(zz, zz_codes), cdhs_iv)
-    _bed.write_tsv(zz.filter(complete), args.complete)
-
-    rest, rest_codes = zz.filter(~complete), zz_codes[~complete]
-    rest_iv = coordinates(rest, rest_codes)
-    none = rest.filter(~_bed.overlaps_any(rest_iv, cdhs_iv))
-    _bed.write_tsv(none, args.none)
-
-    pairs, _, overlap = _bed.overlap_pairs(rest_iv, cdhs_iv)
-    rest_lines = _bed.lines(rest).to_list()
-    wide = np.unique(pairs[overlap >= MIN_OVERLAP])
-    coverage_135 = _bed.sort_unique([rest_lines[i] for i in wide])
-    names_135 = set(rest["name"].gather(wide).to_list())
-    names = rest["name"].to_list()
-    signal = _bed.python_floats(rest["signal"])
-    # numpy prints the percentile with repr, which awk parses back exactly.
-    cutoff = float(np.percentile(_bed.python_floats(none["signal"]), PERCENTILE))
-    less = [
-        rest_lines[i]
-        for i in pairs.tolist()
-        if names[i] not in names_135 and signal[i] >= cutoff
-    ]
-    summary = (
-        _bed.sort_unique(less)
-        + coverage_135
-        + _bed.lines(zz.filter(complete)).to_list()
+    zz = pl.concat(
+        [zz, cdhs_classes(zz, _bed.read_bed(args.cdhs, CDHS))], how="horizontal"
     )
-    with open(args.summary, "w") as f:
-        f.writelines(f"{line}\n" for line in summary)
-    with open(args.rdhs, "w") as f:
-        f.writelines(
-            "\t".join([*fields[:3], fields[-1]]) + "\n"
-            for fields in (line.split("\t") for line in summary)
-        )
+    complete = zz.filter("covers")
+    _bed.write_parquet(complete.select(*rdhs.columns, "accession"), args.complete)
+    rest = zz.filter(~pl.col("covers"))
+    none = rest.filter(~pl.col("overlaps"))
+    _bed.write_parquet(none.select(*rdhs.columns, "accession"), args.none)
+
+    wide = rest.filter(pl.col("overlap") >= MIN_OVERLAP)
+    cutoff = none["signal"].quantile(PERCENTILE, interpolation="linear")
+    less = rest.filter(
+        pl.col("overlaps")
+        & ~pl.col("name").is_in(wide["name"].implode())
+        & (pl.col("signal") >= cutoff)
+    )
+    summary = pl.concat([less, wide, complete]).select(*rdhs.columns, "accession")
+    summary = summary.sort(ORDER)
+    _bed.write_parquet(summary, args.summary)
+    _bed.write_bed(summary.select(*_bed.COORDS, "accession"), args.rdhs)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import subprocess
 
 import call_dhs
 import numpy as np
+import polars as pl
 import pytest
 
 MAX_FLOOR = 12
@@ -136,6 +137,25 @@ def short(text):
     )
 
 
+def bedtools_text(path):
+    """Print a call_dhs table as bedtools merge does, FDR to 10 digits.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Parquet of chrom, start, end and FDR.
+
+    Returns
+    -------
+    str
+        BED text.
+    """
+    return "".join(
+        f"{chrom}\t{start}\t{end}\t{fdr:.10g}\n"
+        for chrom, start, end, fdr in pl.read_parquet(path).iter_rows()
+    )
+
+
 @pytest.mark.parametrize(
     ("text", "order"),
     [
@@ -161,7 +181,7 @@ def test_sweep(bedtools, original, tmp_path, seed):
     hotspots = tmp_path / "hotspots.bed"
     hotspots.write_text(text)
     orders = {call_dhs.fdr_order(line.split("\t")[4]) for line in text.splitlines()}
-    dhs, excluded = tmp_path / "ours.DHSs.bed", tmp_path / "ours.Excluded.bed"
+    dhs, excluded = tmp_path / "DHSs.parquet", tmp_path / "Excluded.parquet"
     call_dhs.main(
         ["--hotspots", str(hotspots), "--dhs", str(dhs), "--excluded", str(excluded)]
     )
@@ -169,5 +189,5 @@ def test_sweep(bedtools, original, tmp_path, seed):
         hotspots, max(orders - {call_dhs.KEEP}), tmp_path, bedtools, original
     )
     assert expected_dhs and expected_excluded
-    assert dhs.read_text() == expected_dhs
-    assert excluded.read_text() == expected_excluded
+    assert bedtools_text(dhs) == expected_dhs
+    assert bedtools_text(excluded) == expected_excluded

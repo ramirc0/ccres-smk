@@ -1,142 +1,167 @@
 """Pieces shared by the cell type-agnostic (step 6) and specific (step 7) calls."""
 
 import _bed
-import numpy as np
 import polars as pl
 
 HIGH = 1.64
 CENTER = 200
 FAR = 2000
-TSS = ["chrom", "start", "end", "transcript", "score", "strand", "gene"]
+TSS = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "transcript": pl.String,
+    "score": pl.String,
+    "strand": pl.String,
+    "gene": pl.String,
+}
 
 
-def select(keys, items, negate=False, field=0):
-    """Keep the items whose key is in `keys`, or with `negate` not in it.
+def read_tss(path):
+    """Read TSSs as the 1 bp intervals of their bases.
 
-    Port of `awk 'FNR==NR {x[$k];next} (key in x)' first second`. awk read an
-    empty first file as no file and printed nothing, even under `!(key in x)`.
-    Here no keys select every item under `negate`.
-
-    Parameters
-    ----------
-    keys : list of str
-        Keys of the first file.
-    items : list
-        Items of the second file: all keys, or all sequences such as tuples
-        and rows that hold the key at `field`.
-    negate : bool
-        Select the items whose key is not in `keys`.
-    field : int
-        Position of the key in a sequence item.
-
-    Returns
-    -------
-    list
-        Selected items, in order.
-    """
-    keys = set(keys)
-    if items and isinstance(items[0], str):
-        return [s for s in items if (s in keys) != negate]
-    return [s for s in items if (s[field] in keys) != negate]
-
-
-def above(lines):
-    """Keep the signal lines whose value exceeds 1.64.
+    TSS-Basic.bed writes a TSS's 1-based position p as `p p`, an empty
+    interval. bedtools widened it to [p - 1, p + 1).
 
     Parameters
     ----------
-    lines : list of tuple of (str, str)
-        Name and value text of each line.
+    path : str
+        TSS BED.
 
     Returns
     -------
-    list of tuple of (str, str)
-        Lines above 1.64.
+    polars.DataFrame
+        TSS rows with start p - 1 and end p.
     """
-    return [line for line in lines if float(line[1]) > HIGH]
+    return _bed.read_bed(path, TSS).with_columns(start=pl.col("end") - 1)
 
 
-def at_most(lines):
-    """Keep the signal lines whose value is at most 1.64.
+def high(mark):
+    """Tell whether a z-score column is above 1.64.
 
     Parameters
     ----------
-    lines : list of tuple of (str, str)
-        Name and value text of each line.
+    mark : str
+        Column of z-scores. Null for a mark without data.
 
     Returns
     -------
-    list of tuple of (str, str)
-        Lines at or below 1.64.
+    polars.Expr
+        True above 1.64, false otherwise, null included.
     """
-    return [line for line in lines if float(line[1]) <= HIGH]
+    return (pl.col(mark) > HIGH).fill_null(False)
 
 
-def read_signal(path):
-    """Read the name and value columns of a signal or maxZ table.
+def label(rest):
+    """Classify DNase-high regions by group and mark.
+
+    A TSS region tests H3K4me3, then H3K27ac. Others test H3K27ac, then
+    H3K4me3. CTCF comes last.
 
     Parameters
     ----------
-    path : str or None
-        Table path, or None for a mark the biosample lacks.
+    rest : polars.Expr
+        Label of a region high in no mark.
 
     Returns
     -------
-    list of tuple of (str, str)
-        Name and value text of each line, none without a table.
+    polars.Expr
+        PLS, pELS, dELS, CA-H3K4me3, CA-CTCF or `rest`, from the columns
+        group, h3k4me3, h3k27ac and ctcf.
     """
-    if path is None:
-        return []
-    with open(path) as f:
-        return [tuple(line.split("\t")[:2]) for line in f]
+    tss = pl.col("group") == "tss"
+    return (
+        pl.when(tss & high("h3k4me3"))
+        .then(pl.lit("PLS"))
+        .when(high("h3k27ac"))
+        .then(
+            pl.when(pl.col("group") == "distal")
+            .then(pl.lit("dELS"))
+            .otherwise(pl.lit("pELS"))
+        )
+        .when(~tss & high("h3k4me3"))
+        .then(pl.lit("CA-H3K4me3"))
+        .when(high("ctcf"))
+        .then(pl.lit("CA-CTCF"))
+        .otherwise(rest)
+    )
 
 
-def tss_groups(names, tss, tss_iv, window_iv, region_iv):
+def with_z(regions, key, tables):
+    """Join z-score tables onto regions.
+
+    Parameters
+    ----------
+    regions : polars.DataFrame
+        Regions with a key column.
+    key : str
+        Column matched against each table's name.
+    tables : dict of str to str or None
+        Path of each mark's Parquet of name and z, or None for a mark without
+        data.
+
+    Returns
+    -------
+    polars.DataFrame
+        The regions with one z column per mark, null without data.
+    """
+    for mark, path in tables.items():
+        if path is None:
+            regions = regions.with_columns(pl.lit(None, pl.Float64).alias(mark))
+        else:
+            z = pl.read_parquet(path, columns=["name", "z"]).rename(
+                {"name": key, "z": mark}
+            )
+            regions = regions.join(z, on=key, how="left", maintain_order="left")
+    return regions
+
+
+def tss_groups(regions, tss, window):
     """Split regions into TSS, proximal and distal groups.
 
     Port of the shared block of 6_Classify-cCREs.sh and Split-cCREs.*.sh,
     with calculate-center-distance.py. TSS regions overlap a TSS. Proximal
     regions overlap a TSS +-2 kb window. Distal regions overlap none. A
-    proximal region whose center lies within 200 bp of its first closest TSS
-    moves to TSS. One over 2 kb away moves to distal.
+    proximal region whose center lies within 200 bp of the nearest TSS start
+    moves to TSS. One over 2 kb away moves to distal. The original measured
+    from the first closest TSS bedtools printed, by edge distance.
 
     Parameters
     ----------
-    names : list of str
-        Name of each region, in file order. The key of the selections.
-    tss : polars.DataFrame
-        TSS table.
-    tss_iv, window_iv, region_iv : tuple of numpy.ndarray
-        Intervals of the TSSs, their windows and the regions, on one
-        chromosome numbering.
+    regions, tss, window : polars.DataFrame
+        Regions, TSSs and their windows, each with chrom, start and end.
 
     Returns
     -------
-    dict of str to list of str
-        Region names of the tss, prox and distal groups, in file order.
+    polars.Series
+        Group of each region: tss, prox or distal.
     """
-    on_tss = _bed.overlaps_any(region_iv, tss_iv)
-    in_window = _bed.overlaps_any(region_iv, window_iv)
-    names = np.array(names, dtype=object)
-    tss_names = names[on_tss].tolist()
-    prox_rows = np.flatnonzero(~on_tss & in_window)
-    prox_names = names[prox_rows].tolist()
-    distal_names = names[~in_window].tolist()
-
-    prox_iv = tuple(a[prox_rows] for a in region_iv)
-    ia, ib = _bed.closest_pairs(prox_iv, tss_iv)
-    first = np.flatnonzero(np.diff(ia, prepend=-1))
-    site = ib[first]
-    center = (prox_iv[1][ia[first]] + prox_iv[2][ia[first]]) / 2
-    start = tss["start"].cast(pl.Int64).to_numpy()[site]
-    plus = tss["strand"].to_numpy()[site] == "+"
-    distance = np.where(plus, start - center, center - start)
-    keyed = [prox_names[i] for i in ia[first]]
-    near = [n for n, d in zip(keyed, distance) if -CENTER <= d <= CENTER]
-    far = [n for n, d in zip(keyed, distance) if d < -FAR or d > FAR]
-
-    return {
-        "tss": tss_names + select(near, prox_names),
-        "prox": select(near + far, prox_names, negate=True),
-        "distal": distal_names + select(far, prox_names),
-    }
+    on_tss = _bed.overlaps_any(regions, tss)
+    in_window = _bed.overlaps_any(regions, window)
+    prox = regions.with_row_index("row").filter(~on_tss & in_window)
+    starts = tss.select("chrom", tss=pl.col("start").cast(pl.Float64)).sort(
+        "chrom", "tss"
+    )
+    nearest = (
+        prox.select("row", "chrom", center=(pl.col("start") + pl.col("end")) / 2)
+        .sort("chrom", "center")
+        .join_asof(
+            starts,
+            left_on="center",
+            right_on="tss",
+            by="chrom",
+            strategy="nearest",
+            check_sortedness=False,
+        )
+        .select("row", distance=(pl.col("tss") - pl.col("center")).abs())
+    )
+    distance = regions.with_row_index("row").join(
+        nearest, on="row", how="left", maintain_order="left"
+    )["distance"]
+    return pl.select(
+        group=pl.when(on_tss | (distance <= CENTER))
+        .then(pl.lit("tss"))
+        .when(~in_window | (distance > FAR))
+        .then(pl.lit("distal"))
+        .otherwise(pl.lit("prox"))
+    ).to_series()

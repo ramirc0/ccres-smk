@@ -12,7 +12,7 @@ Their outputs are not guaranteed to match the release.
 ```
 .tests/integration/      toy inputs (one window per genome) for `pixi run test`
 .tests/reference/        comparison of a run with the May 2022 release
-.tests/unit/             differential tests against bedtools 2.30.0, GNU sort and glibc log
+.tests/unit/             differential tests against bedtools 2.30.0 and the original scripts
 config/
   config.yaml.template   run settings, per-genome constants, input sources
   inputs.b3              BLAKE3 sums of every frozen input
@@ -26,9 +26,9 @@ workflow/
     signal.smk           anchors, steps 4-5
     classify.smk         steps 6-8
   scripts/               argparse scripts, each with build_parser() + main()
-    _bed.py              exact BED text IO, byte-order sort, bedtools 2.30.0 interval ops
+    _bed.py              typed BED and Parquet IO, bigWig averages, interval ops (polars-bio)
     _registry.py         representative-peak loop, region accessions
-    _cres.py             selections by key and z-score, the TSS/proximal/distal split
+    _cres.py             z-score joins, class rules, the TSS/proximal/distal split
     _encode.py           ENCODE file paths: local mirror, then downloads
   envs/pixi.toml         rule env (pixi workspace)
 profiles/
@@ -50,13 +50,13 @@ data/results/<run_id>/<genome>/  outputs, laid out like the release's V7-<genome
 
 | Step | Rule | Output under `data/results/<run_id>/<genome>/` | Original |
 |---|---|---|---|
-| 0 | `call_dhs` | `rDHS/DHSs/<peak>-{DHSs,Excluded}.bed` | 0_Call-DHSs.sh |
-| 1 | `process_dhs` | `rDHS/Processed-DHSs/<signal>-<row>.bed` | 1_Process-DHSs.sh |
-| 2 | `combine_dhs`, `create_rdhs`, `derive_constants` | `rDHS/<g>-DHS-{All,Filtered}.bed`, `rDHS/<g>-rDHS-*`, `rDHS/<g>-Constants.tsv` | 2_Create-rDHSs.sh |
+| 0 | `call_dhs` | `rDHS/DHSs/<peak>-{DHSs,Excluded}.parquet` | 0_Call-DHSs.sh |
+| 1 | `process_dhs` | `rDHS/Processed-DHSs/<signal>-<row>.parquet` | 1_Process-DHSs.sh |
+| 2 | `combine_dhs`, `create_rdhs`, `derive_constants` | `rDHS/<g>-DHS-{All,Filtered}.parquet`, `rDHS/<g>-rDHS-*`, `rDHS/<g>-Constants.tsv` | 2_Create-rDHSs.sh |
 | 3 | `tf_list`, `tf_peaks`, `tf_rpeaks`, `tf_clusters` | `TF/` | 3_Curate-TF-Clusters.sh |
-| - | `anchors` | `<g>-Anchors.bed` | none (rDHSs + rTFBSs, sorted) |
-| 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.txt` | 4_Calculate-Signal-Zscores.sh |
-| 5 | `max_zscore` | `<g>-<mark>-maxZ.txt` | 5_Determine-Max-Zscores.sh |
+| - | `anchors` | `<g>-Anchors.parquet` | none (rDHSs + rTFBSs, sorted) |
+| 4 | `extend_anchors`, `signal_zscore` | `signal-output/<mark>/<exp>-<file>.parquet` | 4_Calculate-Signal-Zscores.sh |
+| 5 | `max_zscore` | `<g>-<mark>-maxZ.parquet` | 5_Determine-Max-Zscores.sh |
 | 6 | `classify_ccres` | `<g>-cCREs-Unfiltered.bed` | 6_Classify-cCREs.sh |
 | 7 | `master_cell_list`, `cell_type_ccres` | `Cell-Type-Specific/Individual-Files/<exp>.{bed.gz,bigBed}` | 7_Call-Cell-Type-Specific.sh |
 | 8 | `pls_genes` | `<g>-PLS-Gene-List.txt` | 8_Assign-PLS-Gene.sh |
@@ -74,6 +74,11 @@ release values. `derive_constants` writes the 10th percentile of the DHS-All sig
 Step 7 names each biosample's files after its first experiment, in the order DNase, H3K4me3,
 H3K27ac, CTCF. The release joined the file accessions. Names the port invents use letters, digits
 and `-`.
+
+Intermediate tables are zstd Parquet with typed columns. The files that leave the pipeline stay
+text: `rDHS/<g>-rDHS-Filtered.bed`, `TF/<g>-rTFBS.bed`, `<g>-cCREs-Unfiltered.bed`, step 7's files
+and the PLS gene list. Coordinates are 0-based and half-open. `TSS-Basic.bed` writes a TSS at
+1-based position p as the empty interval `p p`, which the port reads as the base `[p - 1, p)`.
 
 Steps 4-5 score ATAC like the other assays, but steps 6-8 never read its z-scores. ATAC sets no
 class, though the paper's Fig. 1 lists it among the classifying signals.
@@ -151,7 +156,7 @@ Follow the [Nextstrain Snakemake style guide][style-guide] and
 The launcher env (`pixi.toml` at the root) has Snakemake, the pixi software-deployment plugin and
 the SLURM executor plugins. The rule env is a second pixi workspace, `workflow/envs/`. Its
 `pixi.lock` pins every package, including UCSC tools 482, whose output bytes the release depends
-on. Its `oracle` env holds bedtools 2.30.0, the version of the release, for the unit tests only.
+on. It builds polars-bio from source until a release supports polars 2. Its `oracle` env holds bedtools 2.30.0, the version of the release, for the unit tests only.
 An `onstart` hook installs the env before the first job, since parallel SLURM jobs would race to
 install it.
 

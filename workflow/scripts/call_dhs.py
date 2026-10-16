@@ -21,6 +21,13 @@ import numpy as np
 import polars as pl
 from numba import njit
 
+HOTSPOTS = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "name": pl.String,
+    "fdr": pl.String,
+}
 KEEP = np.iinfo(np.int64).max  # order of an FDR that passes every threshold
 GAP = 1  # bedtools merge -d
 MIN_LENGTH = 50
@@ -37,8 +44,8 @@ def build_parser():
     """
     p = argparse.ArgumentParser(description="Call DHSs from a Hotspot2 FDR track.")
     p.add_argument("--hotspots", required=True, help="Hotspot2 BED, gzipped.")
-    p.add_argument("--dhs", required=True, help="DHS BED to write.")
-    p.add_argument("--excluded", required=True, help="Excluded BED to write.")
+    p.add_argument("--dhs", required=True, help="DHS Parquet to write.")
+    p.add_argument("--excluded", required=True, help="Excluded Parquet to write.")
     return p
 
 
@@ -84,24 +91,6 @@ def per_value(series, function, dtype):
     distinct = series.unique().to_list()
     mapping = dict(zip(distinct, map(function, distinct)))
     return series.replace_strict(mapping, return_dtype=dtype).to_numpy()
-
-
-class Track:
-    """Hotspot positions as arrays, in file order.
-
-    Parameters
-    ----------
-    df : polars.DataFrame
-        String columns chrom, start, end, name, fdr.
-    """
-
-    def __init__(self, df):
-        self.chroms = df["chrom"].unique(maintain_order=True).to_numpy()
-        self.codes = _bed.chrom_codes(df["chrom"])
-        self.starts = df["start"].cast(pl.Int64).to_numpy()
-        self.ends = df["end"].cast(pl.Int64).to_numpy()
-        self.orders = per_value(df["fdr"], fdr_order, pl.Int64)
-        self.fdrs = _bed.python_floats(df["fdr"])
 
 
 @njit(cache=True)
@@ -204,7 +193,7 @@ def _sweep(codes, starts, ends, fdrs, orders, thresholds):
     )
 
 
-def sweep(track):
+def sweep(hotspots):
     """Run the threshold sweep, up to the track's largest FDR order.
 
     Merged intervals only split as the threshold rises. An interval of 50-350 bp
@@ -216,52 +205,41 @@ def sweep(track):
 
     Parameters
     ----------
-    track : Track
-        Hotspot positions.
+    hotspots : polars.DataFrame
+        Hotspot positions in file order, FDRs as text.
 
     Returns
     -------
-    tuple of (tuple of numpy.ndarray, tuple of numpy.ndarray)
-        First row, end and min FDR of the DHSs in calling order, threshold by
-        threshold, and of the excluded intervals.
+    tuple of polars.DataFrame
+        Chrom, start, end and min FDR of the DHSs in calling order, threshold
+        by threshold, and of the excluded intervals.
     """
-    changes = np.unique(track.orders[(track.orders >= 3) & (track.orders < KEEP)])
+    codes = hotspots["chrom"].rle_id()
+    if hotspots.height and codes[-1] + 1 != hotspots["chrom"].n_unique():
+        raise ValueError("A chromosome's positions are not contiguous.")
+    orders = per_value(hotspots["fdr"], fdr_order, pl.Int64)
+    fdrs = hotspots["fdr"].cast(pl.Float64, strict=True)
+    changes = np.unique(orders[(orders >= 3) & (orders < KEEP)])
     found = _sweep(
-        track.codes,
-        track.starts,
-        track.ends,
-        track.fdrs,
-        track.orders,
+        codes.cast(pl.Int64).to_numpy(),
+        hotspots["start"].to_numpy(),
+        hotspots["end"].to_numpy(),
+        fdrs.to_numpy(),
+        orders,
         np.concatenate(([2], changes)),
     )
-    return found[:3], found[3:]
 
-
-def write(track, intervals, path):
-    """Write intervals as chrom, start, end and min FDR, printed as bedtools does.
-
-    Parameters
-    ----------
-    track : Track
-        Source of the chromosome names and starts.
-    intervals : tuple of numpy.ndarray
-        First row, end and min FDR of each interval, written in order.
-    path : str
-        BED to write.
-    """
-    first, end, fdr = intervals
-    rows = zip(
-        track.codes[first].tolist(),
-        track.starts[first].tolist(),
-        end.tolist(),
-        fdr.tolist(),
-    )
-    with open(path, "w") as f:
-        # bedtools prints with std::setprecision(10).
-        f.writelines(
-            f"{track.chroms[code]}\t{start}\t{stop}\t{value:.10g}\n"
-            for code, start, stop, value in rows
+    return tuple(
+        pl.DataFrame(
+            {
+                "chrom": hotspots["chrom"].gather(first),
+                "start": hotspots["start"].gather(first),
+                "end": end,
+                "fdr": fdr,
+            }
         )
+        for first, end, fdr in (found[:3], found[3:])
+    )
 
 
 def main(argv=None):
@@ -273,12 +251,9 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    track = Track(
-        _bed.read_tsv(args.hotspots, ["chrom", "start", "end", "name", "fdr"])
-    )
-    dhs, excluded = sweep(track)
-    write(track, dhs, args.dhs)
-    write(track, excluded, args.excluded)
+    dhs, excluded = sweep(_bed.read_bed(args.hotspots, HOTSPOTS))
+    _bed.write_parquet(dhs, args.dhs)
+    _bed.write_parquet(excluded, args.excluded)
 
 
 if __name__ == "__main__":

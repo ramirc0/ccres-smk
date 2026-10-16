@@ -12,11 +12,11 @@ def processed_dhs(genome):
     Returns
     -------
     list of str
-        Processed DHS BED per row.
+        Processed DHS Parquet per row.
     """
     rows = read_rows(frozen_list(genome, "Hotspot-List.txt"))
     return [
-        f"{OUTDIR}/{genome}/rDHS/Processed-DHSs/{r[2]}-{i}.bed"
+        f"{OUTDIR}/{genome}/rDHS/Processed-DHSs/{r[2]}-{i}.parquet"
         for i, r in enumerate(rows, start=1)
     ]
 
@@ -27,8 +27,8 @@ rule call_dhs:
             encode_file(hotspot_experiment(w.genome, w.acc), w.acc, "bed.gz")
         ),
     output:
-        dhs=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-DHSs.bed",
-        excluded=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-Excluded.bed",
+        dhs=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-DHSs.parquet",
+        excluded=f"{OUTDIR}/{{genome}}/rDHS/DHSs/{{acc}}-Excluded.parquet",
     log:
         f"{LOGDIR}/call_dhs/{{genome}}/{{acc}}.txt",
     benchmark:
@@ -52,12 +52,12 @@ rule call_dhs:
 # outputs output.<acc>.<row>, and step 2 still concatenates them in that order.
 rule process_dhs:
     input:
-        dhs=lambda w: f"{OUTDIR}/{w.genome}/rDHS/DHSs/{hotspot_row(w.genome, w.row)[1]}-DHSs.bed",
+        dhs=lambda w: f"{OUTDIR}/{w.genome}/rDHS/DHSs/{hotspot_row(w.genome, w.row)[1]}-DHSs.parquet",
         bigwig=lambda w: ancient(
             encode_file(hotspot_row(w.genome, w.row)[0], w.acc, "bigWig")
         ),
     output:
-        f"{OUTDIR}/{{genome}}/rDHS/Processed-DHSs/{{acc}}-{{row}}.bed",
+        f"{OUTDIR}/{{genome}}/rDHS/Processed-DHSs/{{acc}}-{{row}}.parquet",
     params:
         peak=lambda w: hotspot_row(w.genome, w.row)[1],
     log:
@@ -85,8 +85,8 @@ rule combine_dhs:
         hotspots=lambda w: frozen(w.genome, "Hotspot-List.txt"),
         processed=lambda w: processed_dhs(w.genome),
     output:
-        all=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
-        filtered=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-Filtered.bed",
+        all=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.parquet",
+        filtered=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-Filtered.parquet",
     params:
         processed=lambda w: f"{OUTDIR}/{w.genome}/rDHS/Processed-DHSs",
         cutoff=lambda w: config["genomes"][w.genome]["dhs_signal_cutoff"],
@@ -113,14 +113,14 @@ rule combine_dhs:
 
 rule create_rdhs:
     input:
-        filtered=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-Filtered.bed",
+        filtered=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-Filtered.parquet",
         previous=lambda w: frozen(w.genome, "rDHS-Previous.bed.gz"),
         cdhs=lambda w: frozen(w.genome, "cDHSs.bed"),
     output:
-        prestam=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-PreStam.txt",
-        complete=f"{OUTDIR}/{{genome}}/rDHS/completeCoverage.bed",
-        none=f"{OUTDIR}/{{genome}}/rDHS/NoCoverage.bed",
-        summary=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered-Summary.txt",
+        prestam=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-PreStam.parquet",
+        complete=f"{OUTDIR}/{{genome}}/rDHS/completeCoverage.parquet",
+        none=f"{OUTDIR}/{{genome}}/rDHS/NoCoverage.parquet",
+        summary=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered-Summary.parquet",
         rdhs=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered.bed",
     log:
         f"{LOGDIR}/create_rdhs/{{genome}}.txt",
@@ -151,7 +151,7 @@ rule create_rdhs:
 # release value.
 rule derive_constants:
     input:
-        f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.bed",
+        f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-DHS-All.parquet",
     output:
         f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-Constants.tsv",
     params:

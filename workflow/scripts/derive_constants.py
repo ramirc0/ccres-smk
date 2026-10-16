@@ -8,7 +8,6 @@ seed.
 
 import argparse
 
-import numpy as np
 import polars as pl
 
 
@@ -21,7 +20,7 @@ def build_parser():
         Parser for the derive_constants.py flags.
     """
     p = argparse.ArgumentParser(description="Derive the DHS signal cutoff.")
-    p.add_argument("--dhs-all", required=True, help="DHS-All BED of step 2.")
+    p.add_argument("--dhs-all", required=True, help="DHS-All Parquet of step 2.")
     p.add_argument("--cutoff", required=True, help="Release dhs_signal_cutoff.")
     p.add_argument("-o", "--output", required=True, help="TSV to write.")
     return p
@@ -36,15 +35,8 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    signal = pl.read_csv(
-        args.dhs_all,
-        separator="\t",
-        has_header=False,
-        columns=[5],
-        quote_char=None,
-        infer_schema=False,
-    ).to_series()
-    cutoff = np.percentile(signal.cast(pl.Float64).to_numpy(), 10)
+    signal = pl.read_parquet(args.dhs_all, columns=["signal"]).to_series()
+    cutoff = signal.quantile(0.1, interpolation="linear")
     with open(args.output, "w") as f:
         f.write("constant\trelease\tderived\tderivation\n")
         f.write(

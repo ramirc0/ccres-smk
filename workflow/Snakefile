@@ -10,7 +10,7 @@ include: "rules/classify.smk"
 rule all:
     input:
         [
-            f"{OUTDIR}/{genome}/{genome}-{mark}-maxZ.txt"
+            f"{OUTDIR}/{genome}/{genome}-{mark}-maxZ.parquet"
             for genome in GENOMES
             for mark in MARKS
         ],

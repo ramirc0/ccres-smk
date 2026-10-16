@@ -22,7 +22,7 @@ def mark_signal_files(genome, mark):
     """
     rows = read_rows(frozen_list(genome, f"{mark}-List.txt"))
     return [
-        f"{OUTDIR}/{genome}/signal-output/{mark}/{r[0]}-{r[1]}.txt"
+        f"{OUTDIR}/{genome}/signal-output/{mark}/{r[0]}-{r[1]}.parquet"
         for r in rows
         if r[1] != "NA"
     ]
@@ -33,7 +33,7 @@ rule anchors:
         rdhs=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered.bed",
         rtfbs=f"{OUTDIR}/{{genome}}/TF/{{genome}}-rTFBS.bed",
     output:
-        f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.bed",
+        f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.parquet",
     log:
         f"{LOGDIR}/anchors/{{genome}}.txt",
     benchmark:
@@ -55,9 +55,9 @@ rule anchors:
 
 rule extend_anchors:
     input:
-        f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.bed",
+        f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.parquet",
     output:
-        f"{OUTDIR}/{{genome}}/signal-output/Anchors-{{width}}bp.bed",
+        f"{OUTDIR}/{{genome}}/signal-output/Anchors-{{width}}bp.parquet",
     wildcard_constraints:
         width=r"\d+",
     log:
@@ -81,10 +81,10 @@ rule extend_anchors:
 
 rule signal_zscore:
     input:
-        anchors=lambda w: f"{OUTDIR}/{w.genome}/signal-output/Anchors-{WIDTH[w.mark]}bp.bed",
+        anchors=lambda w: f"{OUTDIR}/{w.genome}/signal-output/Anchors-{WIDTH[w.mark]}bp.parquet",
         bigwig=lambda w: ancient(encode_file(w.exp, w.signal, "bigWig")),
     output:
-        f"{OUTDIR}/{{genome}}/signal-output/{{mark}}/{{exp}}-{{signal}}.txt",
+        f"{OUTDIR}/{{genome}}/signal-output/{{mark}}/{{exp}}-{{signal}}.parquet",
     wildcard_constraints:
         signal=r"ENCFF\d{3}[A-Z]{3}",
     log:
@@ -111,10 +111,9 @@ rule max_zscore:
         mark_list=lambda w: frozen(w.genome, f"{w.mark}-List.txt"),
         signal=lambda w: mark_signal_files(w.genome, w.mark),
     output:
-        f"{OUTDIR}/{{genome}}/{{genome}}-{{mark}}-maxZ.txt",
+        f"{OUTDIR}/{{genome}}/{{genome}}-{{mark}}-maxZ.parquet",
     params:
         signal=lambda w: f"{OUTDIR}/{w.genome}/signal-output/{w.mark}",
-    threads: 8
     log:
         f"{LOGDIR}/max_zscore/{{genome}}/{{mark}}.txt",
     benchmark:
@@ -128,7 +127,6 @@ rule max_zscore:
         python {workflow.basedir:q}/scripts/max_zscore.py \
             --mark-list {input.mark_list:q} \
             --signal {params.signal:q} \
-            --threads {threads} \
             --output {output:q}
 
         sync {output:q}

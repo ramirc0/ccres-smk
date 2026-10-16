@@ -52,8 +52,7 @@ rule tf_peaks:
             ancient(encode_file(r[0], r[1], "bed.gz")) for r in tf_rows(w.genome)
         ],
     output:
-        bed=f"{OUTDIR}/{{genome}}/TF/tmp.bed",
-        summits=f"{OUTDIR}/{{genome}}/TF/tmp-summits",
+        f"{OUTDIR}/{{genome}}/TF/peaks.parquet",
     params:
         encode_root=ENCODE_ROOT,
         download_dir=DOWNLOAD_DIR,
@@ -71,8 +70,7 @@ rule tf_peaks:
             --tf-list {input.tf_list:q} \
             --encode-root {params.encode_root:q} \
             --download-dir {params.download_dir:q} \
-            --bed {output.bed:q} \
-            --summits {output.summits:q}
+            --output {output:q}
 
         sync {output:q}
         """
@@ -80,9 +78,9 @@ rule tf_peaks:
 
 rule tf_rpeaks:
     input:
-        f"{OUTDIR}/{{genome}}/TF/tmp.bed",
+        f"{OUTDIR}/{{genome}}/TF/peaks.parquet",
     output:
-        f"{OUTDIR}/{{genome}}/TF/tmp-rPeaks",
+        f"{OUTDIR}/{{genome}}/TF/rPeaks.parquet",
     log:
         f"{LOGDIR}/tf_rpeaks/{{genome}}.txt",
     benchmark:
@@ -94,7 +92,7 @@ rule tf_rpeaks:
         exec &> >(tee {log:q})
 
         python {workflow.basedir:q}/scripts/tf_rpeaks.py \
-            --bed {input:q} \
+            --peaks {input:q} \
             --output {output:q}
 
         sync {output:q}
@@ -103,13 +101,13 @@ rule tf_rpeaks:
 
 rule tf_clusters:
     input:
-        rpeaks=f"{OUTDIR}/{{genome}}/TF/tmp-rPeaks",
-        summits=f"{OUTDIR}/{{genome}}/TF/tmp-summits",
+        rpeaks=f"{OUTDIR}/{{genome}}/TF/rPeaks.parquet",
+        peaks=f"{OUTDIR}/{{genome}}/TF/peaks.parquet",
         rdhs=f"{OUTDIR}/{{genome}}/rDHS/{{genome}}-rDHS-Filtered.bed",
     output:
-        clusters=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-Clusters.txt",
-        no_overlap=f"{OUTDIR}/{{genome}}/TF/tmp-no-overlap",
-        summary=f"{OUTDIR}/{{genome}}/TF/{{genome}}-rTFBS-Summary.txt",
+        clusters=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-Clusters.parquet",
+        no_overlap=f"{OUTDIR}/{{genome}}/TF/no-overlap.parquet",
+        summary=f"{OUTDIR}/{{genome}}/TF/{{genome}}-rTFBS-Summary.parquet",
         rtfbs=f"{OUTDIR}/{{genome}}/TF/{{genome}}-rTFBS.bed",
     log:
         f"{LOGDIR}/tf_clusters/{{genome}}.txt",
@@ -123,7 +121,7 @@ rule tf_clusters:
 
         python {workflow.basedir:q}/scripts/tf_clusters.py \
             --rpeaks {input.rpeaks:q} \
-            --summits {input.summits:q} \
+            --peaks {input.peaks:q} \
             --rdhs {input.rdhs:q} \
             --genome {wildcards.genome:q} \
             --clusters {output.clusters:q} \

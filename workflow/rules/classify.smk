@@ -3,14 +3,14 @@
 
 rule classify_ccres:
     input:
-        anchors=f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.bed",
-        dnase=f"{OUTDIR}/{{genome}}/{{genome}}-DNase-maxZ.txt",
-        h3k4me3=f"{OUTDIR}/{{genome}}/{{genome}}-H3K4me3-maxZ.txt",
-        h3k27ac=f"{OUTDIR}/{{genome}}/{{genome}}-H3K27ac-maxZ.txt",
-        ctcf=f"{OUTDIR}/{{genome}}/{{genome}}-CTCF-maxZ.txt",
+        anchors=f"{OUTDIR}/{{genome}}/{{genome}}-Anchors.parquet",
+        dnase=f"{OUTDIR}/{{genome}}/{{genome}}-DNase-maxZ.parquet",
+        h3k4me3=f"{OUTDIR}/{{genome}}/{{genome}}-H3K4me3-maxZ.parquet",
+        h3k27ac=f"{OUTDIR}/{{genome}}/{{genome}}-H3K27ac-maxZ.parquet",
+        ctcf=f"{OUTDIR}/{{genome}}/{{genome}}-CTCF-maxZ.parquet",
         tss=lambda w: frozen(w.genome, "TSS-Basic.bed"),
         tss_4k=lambda w: frozen(w.genome, "TSS-Basic-4K.bed"),
-        tf_clusters=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-Clusters.txt",
+        tf_clusters=f"{OUTDIR}/{{genome}}/TF/{{genome}}-TF-Clusters.parquet",
         previous=lambda w: frozen(w.genome, "cCREs-Previous.bed"),
     output:
         f"{OUTDIR}/{{genome}}/{{genome}}-cCREs-Unfiltered.bed",
@@ -140,7 +140,7 @@ def cell_type_inputs(w):
     """
     (row,) = [r for r in master_rows(w.genome) if mcl.output_name(r) == w.cts]
     inputs = {
-        mark.lower(): f"{OUTDIR}/{w.genome}/signal-output/{mark}/{row[2 * i]}-{row[2 * i + 1]}.txt"
+        mark.lower(): f"{OUTDIR}/{w.genome}/signal-output/{mark}/{row[2 * i]}-{row[2 * i + 1]}.parquet"
         for i, mark in enumerate(mcl.MARKS)
         if row[2 * i] != mcl.MISSING
     }

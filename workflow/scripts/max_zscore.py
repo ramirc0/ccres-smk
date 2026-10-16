@@ -1,18 +1,15 @@
 """Step 5: the highest z-score of each anchor across one mark's experiments.
 
 Port of 5_Determine-Max-Zscores.sh with select-max-zscore.py. Rows whose file
-is NA have no signal file. The files are read in byte order of their names.
-The first seeds each anchor's
-value, and a later value replaces it only if it is greater. Rows keep the
-first file's order. Values print with Python's str().
+is NA have no signal file. Every file lists the same anchors in name
+order. An anchor's value is its largest z. The original printed it with str().
 """
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import _bed
-import numpy as np
+import polars as pl
 
 
 def build_parser():
@@ -25,27 +22,9 @@ def build_parser():
     """
     p = argparse.ArgumentParser(description="Max z-score per anchor for one mark.")
     p.add_argument("--mark-list", required=True, help="Experiment list of the mark.")
-    p.add_argument("--signal", required=True, help="Directory of <exp>-<file>.txt.")
-    p.add_argument("-o", "--output", required=True, help="maxZ table to write.")
-    p.add_argument("--threads", type=int, default=8, help="Files read at once.")
+    p.add_argument("--signal", required=True, help="Directory of <exp>-<file>.parquet.")
+    p.add_argument("-o", "--output", required=True, help="maxZ Parquet to write.")
     return p
-
-
-def read_z(path):
-    """Read the names and z-scores of one signal file.
-
-    Parameters
-    ----------
-    path : pathlib.Path
-        Output of signal_zscore.py.
-
-    Returns
-    -------
-    tuple of (polars.Series, numpy.ndarray)
-        Names and float64 z-scores. Both empty for an empty file.
-    """
-    table = _bed.read_tsv(path, ["name", "z", "signal", "rank"])
-    return table["name"], _bed.python_floats(table["z"])
 
 
 def main(argv=None):
@@ -59,23 +38,19 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     with open(args.mark_list) as f:
         rows = [line.split("\t") for line in f if line.strip()]
-    names = [f"{exp}-{acc}.txt" for exp, acc, *_ in rows if acc != "NA"]
-    paths = [Path(args.signal, n) for n in sorted(names)]
-
-    with ThreadPoolExecutor(args.threads) as pool:
-        tables = pool.map(read_z, paths)
-        anchors, best = next(tables)
-        for names_i, z in tables:
-            if not names_i.equals(anchors):
-                raise ValueError("Signal files list different anchors.")
-            # A NaN never wins `>`, as in the original.
-            best = np.where(z > best, z, best)
-
-    with open(args.output, "w") as f:
-        f.writelines(
-            f"{name}\t{value!r}\n"
-            for name, value in zip(anchors.to_list(), best.tolist())
-        )
+    paths = [
+        Path(args.signal, f"{exp}-{acc}.parquet")
+        for exp, acc, *_ in rows
+        if acc != "NA"
+    ]
+    first = pl.read_parquet(paths[0], columns=["name", "z"])
+    best = first["z"]
+    for path in paths[1:]:
+        table = pl.read_parquet(path, columns=["name", "z"])
+        if not table["name"].equals(first["name"]):
+            raise ValueError(f"{path} lists different anchors.")
+        best = pl.select(pl.max_horizontal(best, table["z"])).to_series()
+    _bed.write_parquet(first.with_columns(z=best), args.output)
 
 
 if __name__ == "__main__":

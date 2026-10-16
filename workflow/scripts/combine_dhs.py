@@ -9,7 +9,6 @@ other than chrEBV and chrM.
 """
 
 import argparse
-import shutil
 from pathlib import Path
 
 import _bed
@@ -17,7 +16,6 @@ import polars as pl
 
 MIN_WIDTH = 150
 MAX_FDR = 0.001
-COLUMNS = ["chrom", "start", "end", "name", "fdr", "signal"]
 
 
 def build_parser():
@@ -31,11 +29,11 @@ def build_parser():
     p = argparse.ArgumentParser(description="Concatenate and filter DHSs.")
     p.add_argument("--hotspots", required=True, help="Hotspot list of the genome.")
     p.add_argument(
-        "--processed", required=True, help="Directory of <signal>-<row>.bed files."
+        "--processed", required=True, help="Directory of <signal>-<row>.parquet."
     )
     p.add_argument("--cutoff", type=float, required=True, help="Minimum signal.")
-    p.add_argument("--all", required=True, help="Concatenated DHS BED to write.")
-    p.add_argument("--filtered", required=True, help="Filtered DHS BED to write.")
+    p.add_argument("--all", required=True, help="Concatenated DHSs to write.")
+    p.add_argument("--filtered", required=True, help="Filtered DHSs to write.")
     return p
 
 
@@ -65,24 +63,16 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    with open(args.all, "wb") as out:
-        for stem in stems(args.hotspots):
-            with open(Path(args.processed, f"{stem}.bed"), "rb") as f:
-                shutil.copyfileobj(f, out, 1 << 24)
-
-    dhs = _bed.read_tsv(args.all, COLUMNS)
-    dhs = dhs.with_columns(
-        signal_value=_bed.python_floats(dhs["signal"]),
-        fdr_value=_bed.python_floats(dhs["fdr"]),
-    )
-    width = pl.col("end").cast(pl.Int64) - pl.col("start").cast(pl.Int64)
+    paths = [Path(args.processed, f"{stem}.parquet") for stem in stems(args.hotspots)]
+    dhs = pl.read_parquet(paths)
+    _bed.write_parquet(dhs, args.all)
     keep = (
         _bed.primary(pl.col("chrom"))
-        & (width >= MIN_WIDTH)
-        & (pl.col("signal_value") >= args.cutoff)
-        & (pl.col("fdr_value") <= MAX_FDR)
+        & (pl.col("end") - pl.col("start") >= MIN_WIDTH)
+        & (pl.col("signal") >= args.cutoff)
+        & (pl.col("fdr") <= MAX_FDR)
     )
-    _bed.write_tsv(dhs.filter(keep).select(COLUMNS), args.filtered)
+    _bed.write_parquet(dhs.filter(keep), args.filtered)
 
 
 if __name__ == "__main__":

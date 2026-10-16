@@ -1,9 +1,9 @@
 """Step 8: assign promoter-like cCREs (PLS) to genes.
 
 Replaces 8_Assign-PLS-Gene.sh with calculate-center-distance.py (assignment).
-A PLS gets the gene of every TSS that step 6's TSS test accepts: a TSS inside
-it, bounds included as bedtools reads a zero-length TSS, or within 200 bp of
-its center, bounds included. Pairs go through `sort -u`.
+A PLS gets the gene of every TSS that step 6's TSS test accepts: a TSS base
+inside it, or a TSS start within 200 bp of its center, bounds included. Pairs
+are distinct and sorted.
 
 The original took the TSSs a PLS overlaps. Only for a PLS that overlapped
 none did it take the closest TSS, if its start lay within 200 bp of the
@@ -14,10 +14,16 @@ import argparse
 
 import _bed
 import _cres
-import numpy as np
 import polars as pl
 
-CCRE = ["chrom", "start", "end", "rdhs", "ccre", "class"]
+CCRE = {
+    "chrom": pl.String,
+    "start": pl.Int64,
+    "end": pl.Int64,
+    "rdhs": pl.String,
+    "ccre": pl.String,
+    "class": pl.String,
+}
 MAX_DISTANCE = 200
 
 
@@ -37,7 +43,7 @@ def build_parser():
 
 
 def main(argv=None):
-    """Write the sorted, deduplicated cCRE-gene pairs.
+    """Write the sorted, distinct cCRE-gene pairs.
 
     Parameters
     ----------
@@ -45,25 +51,22 @@ def main(argv=None):
         Command-line arguments. Defaults to `sys.argv[1:]`.
     """
     args = build_parser().parse_args(argv)
-    pls = _bed.read_tsv(args.ccres, CCRE).filter(pl.col("class") == "PLS")
-    tss = _bed.read_tsv(args.tss, _cres.TSS)
-    pls_codes, tss_codes = _bed.shared_codes(pls["chrom"], tss["chrom"])
-    start = pls["start"].cast(pl.Int64).to_numpy()
-    end = pls["end"].cast(pl.Int64).to_numpy()
-    center = (start + end) / 2
-    # The center lies in [start, end], so this window is the union of the PLS,
-    # end included, and the positions within 200 bp of the center.
-    window = (
-        pls_codes,
-        np.minimum(start, np.ceil(center - MAX_DISTANCE)).astype(np.int64),
-        np.maximum(end, np.floor(center + MAX_DISTANCE)).astype(np.int64) + 1,
+    pls = _bed.read_bed(args.ccres, CCRE).filter(pl.col("class") == "PLS")
+    tss = _cres.read_tss(args.tss)
+    center = (pl.col("start") + pl.col("end")) / 2
+    # A TSS start s is near when center - 200 <= s <= center + 200.
+    window = pls.select(
+        "chrom",
+        start=pl.min_horizontal("start", (center - MAX_DISTANCE).ceil().cast(pl.Int64)),
+        end=pl.max_horizontal(
+            "end", (center + MAX_DISTANCE).floor().cast(pl.Int64) + 1
+        ),
     )
-    position = tss["start"].cast(pl.Int64).to_numpy()
-    ia, ib, _ = _bed.overlap_pairs(window, (tss_codes, position, position + 1))
-    ccre, gene = pls["ccre"].to_list(), tss["gene"].to_list()
-    pairs = [f"{ccre[i]}\t{gene[j]}" for i, j in zip(ia.tolist(), ib.tolist())]
-    with open(args.output, "w") as f:
-        f.writelines(f"{line}\n" for line in _bed.sort_unique(pairs))
+    pairs = _bed.overlap_pairs(window, tss)
+    genes = pl.DataFrame(
+        {"ccre": pls["ccre"][pairs["a"]], "gene": tss["gene"][pairs["b"]]}
+    )
+    _bed.write_bed(genes.unique().sort(genes.columns), args.output)
 
 
 if __name__ == "__main__":

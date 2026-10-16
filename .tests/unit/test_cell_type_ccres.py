@@ -4,38 +4,64 @@ import cell_type_ccres
 import polars as pl
 
 
-def test_tf_summit_is_the_offset_base():
-    """Place a summit at start + column 10, the base step 3 uses."""
-    peaks = pl.DataFrame(
-        [["chr1", "1000", "1200", ".", "0", ".", "5", "-1", "-1", "50"]],
-        schema=cell_type_ccres.NARROWPEAK,
-        orient="row",
+def ccres(group, **z):
+    """Build one cCRE per group with its z-scores.
+
+    Parameters
+    ----------
+    group : list of str
+        Group of each cCRE.
+    **z : list of float or None
+        z-scores per mark column. A mark left out has no data.
+
+    Returns
+    -------
+    polars.DataFrame
+        cCREs with chrom, start, end, group and one column per mark.
+    """
+    n = len(group)
+    marks = {m: z.get(m, [None] * n) for m in ("dnase", "h3k4me3", "h3k27ac", "ctcf")}
+    return pl.DataFrame(
+        {
+            "chrom": ["chr1"] * n,
+            "start": [1000 * i for i in range(n)],
+            "end": [1000 * i + 200 for i in range(n)],
+            "group": group,
+            **marks,
+        },
+        schema_overrides=dict.fromkeys(marks, pl.Float64),
     )
-    summits = cell_type_ccres.summit_intervals(peaks)
-    assert summits.rows() == [("chr1", 1050, 1051)]
+
+
+def test_tf_summit_is_the_offset_base(tmp_path):
+    """Place a summit at start + column 10, the base step 3 uses."""
+    path = tmp_path / "peaks.bed"
+    path.write_text("chr1\t1000\t1200\t.\t0\t.\t5\t-1\t-1\t50\n")
+    assert cell_type_ccres.tf_summits([path]).rows() == [("chr1", 1050, 1051)]
 
 
 def test_a_mark_with_no_high_line_still_splits_the_rest():
-    """Classify by the next mark when no line of a present mark is high."""
-    groups = {"tss": ["D1"], "prox": [], "distal": []}
-    classes = cell_type_ccres.dnase_classes(
-        groups, [("D1", "0.5")], [("D1", "2.0")], [], [("D1", "3.0")]
+    """Classify by the next mark when no row of a present mark is high."""
+    table = ccres(
+        ["tss", "distal"], dnase=[2.0, 0.5], h3k4me3=[0.5, 0.5], ctcf=[3.0, 3.0]
     )
-    assert classes["pELS"] == ["D1"]
-    assert classes["CA-only"] == []
+    assert cell_type_ccres.dnase_labels(table, []).to_list() == ["CA-CTCF", "Low-DNase"]
 
 
 def test_no_dnase_keeps_cres_without_high_marks():
     """Write unclassified rows when no present mark is high in any cCRE."""
-    master = [
-        ["chr1", "100", "300", "D1", "E1", "PLS"],
-        ["chr1", "500", "700", "D2", "E2", "dELS"],
-    ]
-    groups = {"tss": ["D1"], "prox": [], "distal": ["D2"]}
-    lines = cell_type_ccres.no_dnase_lines(
-        master, groups, [("D1", "0.5"), ("D2", "0.1")], [], [], [False, True, True]
+    colors = cell_type_ccres.no_dnase_colors(
+        ccres(["tss", "distal"], h3k4me3=[0.5, 0.1])
     )
-    assert lines == [
-        f"chr1\t{s}\t{e}\t{c}\t0\t.\t{s}\t{e}\t140,140,140\tUnclassified"
-        for s, e, c in (("100", "300", "E1"), ("500", "700", "E2"))
+    assert colors.rows() == [("140,140,140", "Unclassified")] * 2
+
+
+def test_no_dnase_label_lists_every_high_mark():
+    """Color by the first high mark and list all high marks in the label."""
+    colors = cell_type_ccres.no_dnase_colors(
+        ccres(["tss", "prox"], h3k4me3=[2.0, 2.0], h3k27ac=[2.0, 0.5], ctcf=[2.0, 2.0])
+    )
+    assert colors.rows() == [
+        ("255,0,0", "High-H3K4me3,High-H3K27ac,High-CTCF"),
+        ("255,170,170", "High-H3K4me3,High-CTCF"),
     ]
