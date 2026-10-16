@@ -12,7 +12,7 @@ Their outputs are not guaranteed to match the release.
 ```
 .tests/integration/      toy inputs (one window per genome) for `pixi run test`
 .tests/reference/        comparison of a run with the May 2022 release
-.tests/unit/             differential tests against bedtools 2.30.0, GNU sort and glibc
+.tests/unit/             differential tests against bedtools 2.30.0, GNU sort and glibc log
 config/
   config.yaml.template   run settings, per-genome constants, input sources
   inputs.b3              BLAKE3 sums of every frozen input
@@ -28,7 +28,6 @@ workflow/
   scripts/               argparse scripts, each with build_parser() + main()
     _bed.py              exact BED text IO, byte-order sort, bedtools 2.30.0 interval ops
     _registry.py         representative-peak loop, region accessions
-    _zscore.py           glibc's non-FMA log, exact sums
     _cres.py             selections by key and z-score, the TSS/proximal/distal split
     _encode.py           ENCODE file paths: local mirror, then downloads
   envs/pixi.toml         rule env (pixi workspace)

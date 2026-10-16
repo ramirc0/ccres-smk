@@ -4,21 +4,21 @@ Port of Toolkit/Retrieve-Signal.sh with log-zscore-normalization.py.
 bigWigAverageOverBed averages the signal over each anchor. Anchors with zero
 mean0 or zero coverage get z = -inf, the log of 0, and signal 0. The original
 gave them z = -10, above any nonzero signal with a lower z. The others get
-z = (log10(mean0) - mean) / sd over the nonzero anchors, summed in the tool's
-output order. Rows are ranked by z, highest first, and written in anchor
-name order: name, z, signal and rank.
+z = (ln(mean0) - mean) / sd over the nonzero anchors. The original took log10,
+which gives the same z up to rounding. Rows are ranked by z, highest first, and
+written in anchor name order: name, z, signal and rank.
 
-`_zscore` reproduces the glibc log and numpy sums of the original run, so the
-z-scores match it bit for bit on any host.
+The mean and SD sum exactly with `math.fsum`, so z does not depend on row
+order. The log is glibc's, through polars.
 """
 
 import argparse
+import math
 import subprocess
 import tempfile
 from pathlib import Path
 
 import _bed
-import _zscore
 import numpy as np
 import polars as pl
 
@@ -69,8 +69,10 @@ def score(out):
     """
     mean0 = _bed.python_floats(out["mean0"])
     zero = (mean0 == 0) | (_bed.python_floats(out["covered"]) == 0)
-    logs = _zscore.log10(mean0[~zero])
-    mean, sd = _zscore.mean_std(logs)
+    logs = pl.Series(mean0[~zero]).log().to_numpy()
+    mean = math.fsum(logs.tolist()) / len(logs)
+    deviation = logs - mean
+    sd = math.sqrt(math.fsum((deviation * deviation).tolist()) / len(logs))
     z = np.full(len(mean0), -np.inf)
     z[~zero] = (logs - mean) / sd
     if not np.all(np.isfinite(z[~zero])):
