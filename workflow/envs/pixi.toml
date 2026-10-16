@@ -14,6 +14,15 @@ ucsc-bigwigaverageoverbed = "==482"
 ucsc-bedtobigbed = "==482"
 ucsc-bigbedtobed = "==482"
 htslib = ">=1.21"
+pyarrow = ">=23.0.1,<25"
+datafusion = ">=53,<54"
+polars-config-meta = ">=0.3.2,<1"
+# Builds polars-bio from source. Its rust-toolchain.toml pins 1.91.0.
+rust = "==1.91.0"
+
+# polars 2 support is unreleased (PR #478, planned for 0.37.0).
+[pypi-dependencies]
+polars-bio = { git = "https://github.com/biodatageeks/polars-bio", rev = "fd622fc8a099a86f6972671471d9f972077d1eb1" }
 
 [feature.test.dependencies]
 pytest = ">=8"
